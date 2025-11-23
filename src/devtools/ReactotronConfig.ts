@@ -6,10 +6,6 @@
 import { Platform, NativeModules } from "react-native"
 import { router } from "expo-router"
 import { ArgType } from "reactotron-core-client"
-import { ReactotronReactNative } from "reactotron-react-native"
-import mmkvPlugin from "reactotron-react-native-mmkv"
-
-import { storage } from "@/utils/storage"
 
 import { Reactotron } from "./ReactotronClient"
 
@@ -20,8 +16,6 @@ const reactotron = Reactotron.configure({
     Reactotron.clear()
   },
 })
-
-reactotron.use(mmkvPlugin<ReactotronReactNative>({ storage }))
 
 if (Platform.OS !== "web") {
   reactotron.useReactNative({

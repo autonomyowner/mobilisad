@@ -6,13 +6,12 @@ import {
   Platform,
   ScrollView,
   ScrollViewProps,
+  StatusBar,
   StyleProp,
   View,
   ViewStyle,
 } from "react-native"
 import { useScrollToTop } from "@react-navigation/native"
-import { SystemBars, SystemBarsProps, SystemBarStyle } from "react-native-edge-to-edge"
-import { KeyboardAwareScrollView } from "react-native-keyboard-controller"
 
 import { useAppTheme } from "@/theme/context"
 import { $styles } from "@/theme/styles"
@@ -42,9 +41,9 @@ interface BaseScreenProps {
    */
   backgroundColor?: string
   /**
-   * System bar setting. Defaults to dark.
+   * Status bar style. Defaults to dark-content.
    */
-  systemBarStyle?: SystemBarStyle
+  statusBarStyle?: "light-content" | "dark-content"
   /**
    * By how much should we offset the keyboard? Defaults to 0.
    */
@@ -53,10 +52,6 @@ interface BaseScreenProps {
    * By how much we scroll up when the keyboard is shown. Defaults to 50.
    */
   keyboardBottomOffset?: number
-  /**
-   * Pass any additional props directly to the SystemBars component.
-   */
-  SystemBarsProps?: SystemBarsProps
   /**
    * Pass any additional props directly to the KeyboardAvoidingView component.
    */
@@ -191,7 +186,6 @@ function ScreenWithScrolling(props: ScreenProps) {
   const {
     children,
     keyboardShouldPersistTaps = "handled",
-    keyboardBottomOffset = DEFAULT_BOTTOM_OFFSET,
     contentContainerStyle,
     ScrollViewProps,
     style,
@@ -206,8 +200,7 @@ function ScreenWithScrolling(props: ScreenProps) {
   useScrollToTop(ref)
 
   return (
-    <KeyboardAwareScrollView
-      bottomOffset={keyboardBottomOffset}
+    <ScrollView
       {...{ keyboardShouldPersistTaps, scrollEnabled, ref }}
       {...ScrollViewProps}
       onLayout={(e) => {
@@ -226,7 +219,7 @@ function ScreenWithScrolling(props: ScreenProps) {
       ]}
     >
       {children}
-    </KeyboardAwareScrollView>
+    </ScrollView>
   )
 }
 
@@ -248,8 +241,7 @@ export function Screen(props: ScreenProps) {
     KeyboardAvoidingViewProps,
     keyboardOffset = 0,
     safeAreaEdges,
-    SystemBarsProps,
-    systemBarStyle,
+    statusBarStyle,
   } = props
 
   const $containerInsets = useSafeAreaInsetsStyle(safeAreaEdges)
@@ -262,9 +254,8 @@ export function Screen(props: ScreenProps) {
         $containerInsets,
       ]}
     >
-      <SystemBars
-        style={systemBarStyle || (themeContext === "dark" ? "light" : "dark")}
-        {...SystemBarsProps}
+      <StatusBar
+        barStyle={statusBarStyle || (themeContext === "dark" ? "light-content" : "dark-content")}
       />
 
       <KeyboardAvoidingView

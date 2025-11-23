@@ -6,6 +6,7 @@ import {
   useContext,
   useEffect,
   useMemo,
+  useState,
 } from "react"
 import { StyleProp, useColorScheme } from "react-native"
 import {
@@ -13,9 +14,7 @@ import {
   DefaultTheme as NavDefaultTheme,
   Theme as NavTheme,
 } from "@react-navigation/native"
-import { useMMKVString } from "react-native-mmkv"
-
-import { storage } from "@/utils/storage"
+import AsyncStorage from "@react-native-async-storage/async-storage"
 
 import { setImperativeTheming } from "./context.utils"
 import { darkTheme, lightTheme } from "./theme"
@@ -27,6 +26,8 @@ import type {
   ThemedFnT,
   ThemedStyle,
 } from "./types"
+
+const THEME_STORAGE_KEY = "ignite.themeScheme"
 
 export type ThemeContextType = {
   navigationTheme: NavTheme
@@ -58,7 +59,16 @@ export const ThemeProvider: FC<PropsWithChildren<ThemeProviderProps>> = ({
   // The operating system theme:
   const systemColorScheme = useColorScheme()
   // Our saved theme context: can be "light", "dark", or undefined (system theme)
-  const [themeScheme, setThemeScheme] = useMMKVString("ignite.themeScheme", storage)
+  const [themeScheme, setThemeSchemeState] = useState<string | undefined>(undefined)
+
+  // Load saved theme on mount
+  useEffect(() => {
+    AsyncStorage.getItem(THEME_STORAGE_KEY).then((value) => {
+      if (value) {
+        setThemeSchemeState(value)
+      }
+    })
+  }, [])
 
   /**
    * This function is used to set the theme context and is exported from the useAppTheme() hook.
@@ -66,16 +76,18 @@ export const ThemeProvider: FC<PropsWithChildren<ThemeProviderProps>> = ({
    *  - setThemeContextOverride("light") sets the app theme to light no matter what the system theme is.
    *  - setThemeContextOverride(undefined) the app will follow the operating system theme.
    */
-  const setThemeContextOverride = useCallback(
-    (newTheme: ThemeContextModeT) => {
-      setThemeScheme(newTheme)
-    },
-    [setThemeScheme],
-  )
+  const setThemeContextOverride = useCallback((newTheme: ThemeContextModeT) => {
+    setThemeSchemeState(newTheme)
+    if (newTheme) {
+      AsyncStorage.setItem(THEME_STORAGE_KEY, newTheme)
+    } else {
+      AsyncStorage.removeItem(THEME_STORAGE_KEY)
+    }
+  }, [])
 
   /**
    * initialContext is the theme context passed in from the app.tsx file and always takes precedence.
-   * themeScheme is the value from MMKV. If undefined, we fall back to the system theme
+   * themeScheme is the value from storage. If undefined, we fall back to the system theme
    * systemColorScheme is the value from the device. If undefined, we fall back to "light"
    */
   const themeContext: ImmutableThemeContextModeT = useMemo(() => {
