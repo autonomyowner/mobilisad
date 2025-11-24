@@ -6,6 +6,7 @@ import { GestureHandlerRootView } from "react-native-gesture-handler"
 
 import { initI18n } from "@/i18n"
 import { ThemeProvider } from "@/theme/context"
+import { AuthProvider } from "@/context/AuthContext"
 import { customFontsToLoad } from "@/theme/typography"
 import { loadDateFnsLocale } from "@/utils/formatDate"
 
@@ -48,7 +49,9 @@ export default function Root() {
     <GestureHandlerRootView style={{ flex: 1 }}>
       <SafeAreaProvider initialMetrics={initialWindowMetrics}>
         <ThemeProvider>
-          <Slot />
+          <AuthProvider>
+            <Slot />
+          </AuthProvider>
         </ThemeProvider>
       </SafeAreaProvider>
     </GestureHandlerRootView>

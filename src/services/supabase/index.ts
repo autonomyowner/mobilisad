@@ -52,3 +52,23 @@ export {
   subscribeToProducts,
 } from './productService'
 export type { ProductWithImage } from './productService'
+
+// Export auth services
+export {
+  signUp,
+  signIn,
+  signOut,
+  getCurrentProfile,
+  updateProfile,
+  resetPassword,
+  onAuthStateChange,
+} from './authService'
+export type { SignUpData, SignInData, AuthResponse } from './authService'
+
+// Export order services
+export {
+  createOrder,
+  getProductById,
+  WILAYAS,
+} from './orderService'
+export type { CreateOrderInput, DeliveryType } from './orderService'

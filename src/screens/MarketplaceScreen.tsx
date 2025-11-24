@@ -44,9 +44,10 @@ interface ProductCardProps {
   product: ProductWithImage
   compact?: boolean
   horizontal?: boolean
+  onPress?: (product: ProductWithImage) => void
 }
 
-const ProductCard: FC<ProductCardProps> = ({ product, compact, horizontal }) => {
+const ProductCard: FC<ProductCardProps> = ({ product, compact, horizontal, onPress }) => {
   const scaleAnim = useRef(new Animated.Value(1)).current
 
   const handlePressIn = () => {
@@ -64,6 +65,12 @@ const ProductCard: FC<ProductCardProps> = ({ product, compact, horizontal }) => 
     }).start()
   }
 
+  const handlePress = () => {
+    if (onPress) {
+      onPress(product)
+    }
+  }
+
   // Calculate discount percentage
   const discount = product.original_price
     ? Math.round(((product.original_price - product.price) / product.original_price) * 100)
@@ -77,7 +84,7 @@ const ProductCard: FC<ProductCardProps> = ({ product, compact, horizontal }) => 
   }
 
   return (
-    <Pressable onPressIn={handlePressIn} onPressOut={handlePressOut}>
+    <Pressable onPressIn={handlePressIn} onPressOut={handlePressOut} onPress={handlePress}>
       <Animated.View
         style={[
           getCardStyle(),
@@ -142,9 +149,10 @@ const ProductCard: FC<ProductCardProps> = ({ product, compact, horizontal }) => 
 
 interface MarketplaceScreenProps {
   onNavigateToCart?: () => void
+  onProductPress?: (product: ProductWithImage) => void
 }
 
-export const MarketplaceScreen: FC<MarketplaceScreenProps> = function MarketplaceScreen({ onNavigateToCart }) {
+export const MarketplaceScreen: FC<MarketplaceScreenProps> = function MarketplaceScreen({ onNavigateToCart, onProductPress }) {
   const $topInsets = useSafeAreaInsetsStyle(["top"])
   const [isLoading, setIsLoading] = useState(true)
   const [refreshing, setRefreshing] = useState(false)
@@ -291,7 +299,7 @@ export const MarketplaceScreen: FC<MarketplaceScreenProps> = function Marketplac
               contentContainerStyle={styles.productsRow}
             >
               {newProducts.map((product) => (
-                <ProductCard key={product.id} product={product} horizontal />
+                <ProductCard key={product.id} product={product} horizontal onPress={onProductPress} />
               ))}
             </ScrollView>
           ) : (
@@ -318,7 +326,7 @@ export const MarketplaceScreen: FC<MarketplaceScreenProps> = function Marketplac
             <View style={styles.productsGrid}>
               {saleProducts.map((product) => (
                 <View key={product.id} style={styles.gridItem}>
-                  <ProductCard product={product} />
+                  <ProductCard product={product} onPress={onProductPress} />
                 </View>
               ))}
             </View>

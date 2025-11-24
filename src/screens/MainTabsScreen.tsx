@@ -16,6 +16,8 @@ import { ShopScreen } from "./ShopScreen"
 import { CartScreen } from "./CartScreen"
 import { DashboardScreen } from "./DashboardScreen"
 import { ProfileScreen } from "./ProfileScreen"
+import { ProductDetailScreen } from "./ProductDetailScreen"
+import { ProductWithImage } from "@/services/supabase/productService"
 
 const COLORS = {
   background: "#0D0D0D",
@@ -37,6 +39,7 @@ export const MainTabsScreen: FC = function MainTabsScreen() {
   const insets = useSafeAreaInsets()
   const pagerRef = useRef<PagerView>(null)
   const [currentPage, setCurrentPage] = useState(0)
+  const [selectedProduct, setSelectedProduct] = useState<ProductWithImage | null>(null)
 
   // Animation for tab indicator
   const indicatorPosition = useRef(new Animated.Value(0)).current
@@ -62,7 +65,25 @@ export const MainTabsScreen: FC = function MainTabsScreen() {
     pagerRef.current?.setPage(2) // Cart is at index 2
   }
 
+  const handleProductPress = (product: ProductWithImage) => {
+    setSelectedProduct(product)
+  }
+
+  const handleBackFromProduct = () => {
+    setSelectedProduct(null)
+  }
+
   const tabWidth = 100 / TABS.length
+
+  // Show ProductDetailScreen if a product is selected
+  if (selectedProduct) {
+    return (
+      <ProductDetailScreen
+        product={selectedProduct}
+        onBack={handleBackFromProduct}
+      />
+    )
+  }
 
   return (
     <View style={styles.container}>
@@ -76,7 +97,7 @@ export const MainTabsScreen: FC = function MainTabsScreen() {
         overScrollMode="always"
       >
         <View key="home" style={styles.page}>
-          <MarketplaceScreen onNavigateToCart={handleNavigateToCart} />
+          <MarketplaceScreen onNavigateToCart={handleNavigateToCart} onProductPress={handleProductPress} />
         </View>
         <View key="shop" style={styles.page}>
           <ShopScreen />
