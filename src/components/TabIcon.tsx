@@ -1,12 +1,13 @@
 import React from "react"
 import Svg, { Path, Circle } from "react-native-svg"
-import { View, ViewStyle } from "react-native"
+import { View, ViewStyle, Text, StyleSheet } from "react-native"
 
 interface TabIconProps {
   name: "home" | "shop" | "freelance" | "dashboard" | "profile"
   active?: boolean
   size?: number
   color?: string
+  badge?: number
 }
 
 export const TabIcon: React.FC<TabIconProps> = ({
@@ -14,6 +15,7 @@ export const TabIcon: React.FC<TabIconProps> = ({
   active = false,
   size = 24,
   color = "#FFFFFF",
+  badge,
 }) => {
   const strokeWidth = 2.5
   const cornerRadius = 4
@@ -87,20 +89,28 @@ export const TabIcon: React.FC<TabIconProps> = ({
         )
 
       case "dashboard":
-        // Paper plane / DM style - rotated -45°
+        // Bar chart / Analytics icon with rounded squares
         return (
           <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
             <Path
-              d="M21.7071 2.29289C22.4381 3.02389 22.2556 4.23949 21.3146 4.72684L4.98959 12.8893C3.96733 13.4204 2.8034 12.4721 3.08233 11.3411L4.96719 3.94803C5.11032 3.39171 5.39171 2.89032 5.94803 2.74719L13.3411 0.862326C14.4721 0.583397 15.4204 1.74733 14.8893 2.76959L6.72684 19.0946C6.23949 20.0356 5.02389 20.2181 4.29289 19.4871L2.29289 17.4871C1.90237 17.0966 1.90237 16.4634 2.29289 16.0729L16.0729 2.29289C16.4634 1.90237 17.0966 1.90237 17.4871 2.29289L21.7071 2.29289Z"
+              d="M3 19V10C3 9.44772 3.44772 9 4 9H7C7.55228 9 8 9.44772 8 10V19C8 19.5523 7.55228 20 7 20H4C3.44772 20 3 19.5523 3 19Z"
               fill={active ? color : "none"}
               stroke={color}
               strokeWidth={strokeWidth}
               strokeLinecap="round"
               strokeLinejoin="round"
-              transform="rotate(-45 12 12)"
             />
             <Path
-              d="M10.5 13.5L21 3"
+              d="M10 19V5C10 4.44772 10.4477 4 11 4H14C14.5523 4 15 4.44772 15 5V19C15 19.5523 14.5523 20 14 20H11C10.4477 20 10 19.5523 10 19Z"
+              fill={active ? color : "none"}
+              stroke={color}
+              strokeWidth={strokeWidth}
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            />
+            <Path
+              d="M17 19V13C17 12.4477 17.4477 12 18 12H21C21.5523 12 22 12.4477 22 13V19C22 19.5523 21.5523 20 21 20H18C17.4477 20 17 19.5523 17 19Z"
+              fill={active ? color : "none"}
               stroke={color}
               strokeWidth={strokeWidth}
               strokeLinecap="round"
@@ -146,5 +156,37 @@ export const TabIcon: React.FC<TabIconProps> = ({
     }
   }
 
-  return <View style={{ width: size, height: size }}>{renderIcon()}</View>
+  return (
+    <View style={{ width: size, height: size }}>
+      {renderIcon()}
+      {badge !== undefined && badge > 0 && (
+        <View style={styles.badgeContainer}>
+          <Text style={styles.badgeText}>{badge > 99 ? '99+' : badge}</Text>
+        </View>
+      )}
+    </View>
+  )
 }
+
+const styles = StyleSheet.create({
+  badgeContainer: {
+    position: 'absolute',
+    top: -4,
+    right: -8,
+    backgroundColor: '#FF3B30',
+    borderRadius: 10,
+    minWidth: 18,
+    height: 18,
+    paddingHorizontal: 4,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 2,
+    borderColor: '#1A1A1A',
+  },
+  badgeText: {
+    color: '#FFFFFF',
+    fontSize: 10,
+    fontWeight: '700',
+  },
+})
+

@@ -16,6 +16,7 @@ import {
   KeyboardAvoidingView,
   Platform,
 } from "react-native"
+import { Video, ResizeMode } from "expo-av"
 import { Text } from "@/components/Text"
 import { useSafeAreaInsetsStyle } from "@/utils/useSafeAreaInsetsStyle"
 import { ProductWithImage } from "@/services/supabase/productService"
@@ -191,6 +192,20 @@ export const ProductDetailScreen: FC<ProductDetailScreenProps> = ({ product, onB
               </View>
             )}
           </View>
+
+          {/* Product Video (if available) */}
+          {product.video_url && (
+            <View style={styles.videoContainer}>
+              <Text style={styles.videoLabel}>Video de demonstration</Text>
+              <Video
+                source={{ uri: product.video_url }}
+                style={styles.productVideo}
+                useNativeControls
+                resizeMode={ResizeMode.CONTAIN}
+                isLooping
+              />
+            </View>
+          )}
 
           {/* Product Info */}
           <View style={styles.productInfo}>
@@ -445,6 +460,26 @@ const styles = StyleSheet.create({
     fontWeight: "700",
     color: COLORS.text,
   } as TextStyle,
+
+  // Video
+  videoContainer: {
+    width: "100%",
+    marginBottom: 20,
+  } as ViewStyle,
+  videoLabel: {
+    fontSize: 14,
+    fontWeight: "600",
+    color: COLORS.textSecondary,
+    textTransform: "uppercase",
+    letterSpacing: 1,
+    marginBottom: 12,
+  } as TextStyle,
+  productVideo: {
+    width: "100%",
+    height: 250,
+    borderRadius: 16,
+    backgroundColor: COLORS.surface,
+  } as ViewStyle,
 
   // Product Info
   productInfo: {

@@ -19,6 +19,8 @@ import { ProfileScreen } from "./ProfileScreen"
 import { ProductDetailScreen } from "./ProductDetailScreen"
 import { ProductWithImage } from "@/services/supabase/productService"
 import { TabIcon } from "@/components/TabIcon"
+import { useAuth } from "@/context/AuthContext"
+import { useRealtimeOrders } from "@/hooks/useRealtimeOrders"
 
 const COLORS = {
   background: "#0D0D0D",
@@ -41,6 +43,15 @@ export const MainTabsScreen: FC = function MainTabsScreen() {
   const pagerRef = useRef<PagerView>(null)
   const [currentPage, setCurrentPage] = useState(0)
   const [selectedProduct, setSelectedProduct] = useState<ProductWithImage | null>(null)
+
+  // Get authenticated user
+  const { user } = useAuth()
+
+  // Subscribe to real-time orders for seller (only if user is authenticated and is a seller)
+  const { pendingCount } = useRealtimeOrders({
+    sellerId: user?.id || '',
+    enabled: !!user?.id && user?.role === 'seller',
+  })
 
   // Animation for tab indicator
   const indicatorPosition = useRef(new Animated.Value(0)).current
@@ -146,6 +157,7 @@ export const MainTabsScreen: FC = function MainTabsScreen() {
                 active={currentPage === index}
                 size={24}
                 color={currentPage === index ? COLORS.accent : COLORS.textMuted}
+                badge={tab.key === 'dashboard' ? pendingCount : undefined}
               />
             </View>
             <Text

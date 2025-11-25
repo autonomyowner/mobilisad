@@ -14,8 +14,11 @@ import {
   TextInput,
   Alert,
   Switch,
+  Image,
+  ImageStyle,
 } from "react-native"
 import { LinearGradient } from "expo-linear-gradient"
+import * as ImagePicker from "expo-image-picker"
 import { Text } from "@/components/Text"
 import { useSafeAreaInsetsStyle } from "@/utils/useSafeAreaInsetsStyle"
 import { useAuth } from "@/context/AuthContext"
@@ -243,10 +246,61 @@ const AddProductModal: FC<AddProductModalProps> = ({ visible, onClose, onAdd, ca
   const [name, setName] = useState("")
   const [price, setPrice] = useState("")
   const [category, setCategory] = useState(categories[0] || "")
+  const [productType, setProductType] = useState("")
   const [description, setDescription] = useState("")
   const [stockQty, setStockQty] = useState("")
   const [isNew, setIsNew] = useState(false)
   const [isPromo, setIsPromo] = useState(false)
+  const [imageUri, setImageUri] = useState<string | null>(null)
+  const [videoUri, setVideoUri] = useState<string | null>(null)
+  const [uploading, setUploading] = useState(false)
+
+  const pickImage = async () => {
+    try {
+      const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync()
+      if (status !== "granted") {
+        Alert.alert("Permission requise", "L'acces a la galerie est necessaire")
+        return
+      }
+
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        allowsEditing: true,
+        aspect: [4, 3],
+        quality: 0.8,
+      })
+
+      if (!result.canceled && result.assets[0]) {
+        setImageUri(result.assets[0].uri)
+      }
+    } catch (error) {
+      console.error("Error picking image:", error)
+      Alert.alert("Erreur", "Impossible de selectionner l'image")
+    }
+  }
+
+  const pickVideo = async () => {
+    try {
+      const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync()
+      if (status !== "granted") {
+        Alert.alert("Permission requise", "L'acces a la galerie est necessaire")
+        return
+      }
+
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ImagePicker.MediaTypeOptions.Videos,
+        allowsEditing: true,
+        quality: 0.8,
+      })
+
+      if (!result.canceled && result.assets[0]) {
+        setVideoUri(result.assets[0].uri)
+      }
+    } catch (error) {
+      console.error("Error picking video:", error)
+      Alert.alert("Erreur", "Impossible de selectionner la video")
+    }
+  }
 
   const handleSubmit = () => {
     if (!name.trim()) {
@@ -257,24 +311,37 @@ const AddProductModal: FC<AddProductModalProps> = ({ visible, onClose, onAdd, ca
       Alert.alert("Erreur", "Le prix doit etre superieur a 0")
       return
     }
+    if (!productType.trim()) {
+      Alert.alert("Erreur", "Le type de produit est requis")
+      return
+    }
+
+    setUploading(true)
 
     onAdd({
       name: name.trim(),
       price: parseFloat(price),
       category: category || "Autre",
+      product_type: productType.trim(),
       description: description.trim(),
       stock_quantity: parseInt(stockQty) || 0,
       is_new: isNew,
       is_promo: isPromo,
+      image_uri: imageUri || undefined,
+      video_uri: videoUri || undefined,
     })
 
     // Reset form
     setName("")
     setPrice("")
+    setProductType("")
     setDescription("")
     setStockQty("")
     setIsNew(false)
     setIsPromo(false)
+    setImageUri(null)
+    setVideoUri(null)
+    setUploading(false)
     onClose()
   }
 
@@ -309,6 +376,15 @@ const AddProductModal: FC<AddProductModalProps> = ({ visible, onClose, onAdd, ca
               keyboardType="numeric"
             />
 
+            <Text style={styles.inputLabel}>Type de produit *</Text>
+            <TextInput
+              style={styles.textInput}
+              value={productType}
+              onChangeText={setProductType}
+              placeholder="Ex: Parfum Homme, Vetements Hiver, etc."
+              placeholderTextColor={COLORS.textMuted}
+            />
+
             <Text style={styles.inputLabel}>Categorie</Text>
             <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.categoryPicker}>
               {categories.map((cat) => (
@@ -323,6 +399,44 @@ const AddProductModal: FC<AddProductModalProps> = ({ visible, onClose, onAdd, ca
                 </TouchableOpacity>
               ))}
             </ScrollView>
+
+            <Text style={styles.inputLabel}>Image du produit</Text>
+            <TouchableOpacity style={styles.mediaUploadBtn} onPress={pickImage}>
+              <Text style={styles.mediaUploadBtnText}>
+                {imageUri ? "✓ Image selectionnee" : "Cliquez pour selectionner une image"}
+              </Text>
+              <Text style={styles.mediaUploadHint}>JPG, PNG, WebP ou GIF (max. 5MB)</Text>
+            </TouchableOpacity>
+            {imageUri && (
+              <View style={styles.mediaPreview}>
+                <Image source={{ uri: imageUri }} style={styles.imagePreview} />
+                <TouchableOpacity
+                  style={styles.removeMediaBtn}
+                  onPress={() => setImageUri(null)}
+                >
+                  <Text style={styles.removeMediaBtnText}>X</Text>
+                </TouchableOpacity>
+              </View>
+            )}
+
+            <Text style={styles.inputLabel}>Video de demonstration (optionnel)</Text>
+            <TouchableOpacity style={styles.mediaUploadBtn} onPress={pickVideo}>
+              <Text style={styles.mediaUploadBtnText}>
+                {videoUri ? "✓ Video selectionnee" : "Cliquez pour ajouter une video"}
+              </Text>
+              <Text style={styles.mediaUploadHint}>MP4/WebM - 30s max - 10 MB max</Text>
+            </TouchableOpacity>
+            {videoUri && (
+              <View style={styles.mediaPreview}>
+                <Text style={styles.videoPreviewText}>Video selectionnee</Text>
+                <TouchableOpacity
+                  style={styles.removeMediaBtn}
+                  onPress={() => setVideoUri(null)}
+                >
+                  <Text style={styles.removeMediaBtnText}>X</Text>
+                </TouchableOpacity>
+              </View>
+            )}
 
             <Text style={styles.inputLabel}>Description</Text>
             <TextInput
@@ -366,8 +480,14 @@ const AddProductModal: FC<AddProductModalProps> = ({ visible, onClose, onAdd, ca
             </View>
           </ScrollView>
 
-          <TouchableOpacity style={styles.submitBtn} onPress={handleSubmit}>
-            <Text style={styles.submitBtnText}>Ajouter le produit</Text>
+          <TouchableOpacity
+            style={[styles.submitBtn, uploading && styles.submitBtnDisabled]}
+            onPress={handleSubmit}
+            disabled={uploading}
+          >
+            <Text style={styles.submitBtnText}>
+              {uploading ? "Ajout en cours..." : "Ajouter le produit"}
+            </Text>
           </TouchableOpacity>
         </View>
       </View>
@@ -1218,9 +1338,69 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     alignItems: "center",
   } as ViewStyle,
+  submitBtnDisabled: {
+    backgroundColor: COLORS.textMuted,
+    opacity: 0.5,
+  } as ViewStyle,
   submitBtnText: {
     fontSize: 15,
     fontWeight: "700",
     color: COLORS.background,
+  } as TextStyle,
+  mediaUploadBtn: {
+    backgroundColor: COLORS.surface,
+    borderWidth: 1,
+    borderColor: COLORS.surfaceBorder,
+    borderStyle: "dashed",
+    borderRadius: 10,
+    paddingVertical: 16,
+    paddingHorizontal: 14,
+    alignItems: "center",
+    marginBottom: 12,
+  } as ViewStyle,
+  mediaUploadBtnText: {
+    fontSize: 14,
+    color: COLORS.text,
+    marginBottom: 4,
+  } as TextStyle,
+  mediaUploadHint: {
+    fontSize: 11,
+    color: COLORS.textMuted,
+  } as TextStyle,
+  mediaPreview: {
+    position: "relative",
+    marginBottom: 16,
+    borderRadius: 10,
+    overflow: "hidden",
+    backgroundColor: COLORS.surface,
+    borderWidth: 1,
+    borderColor: COLORS.surfaceBorder,
+  } as ViewStyle,
+  imagePreview: {
+    width: "100%",
+    height: 200,
+    resizeMode: "cover",
+  } as ImageStyle,
+  videoPreviewText: {
+    fontSize: 14,
+    color: COLORS.text,
+    padding: 40,
+    textAlign: "center",
+  } as TextStyle,
+  removeMediaBtn: {
+    position: "absolute",
+    top: 8,
+    right: 8,
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    backgroundColor: COLORS.error,
+    justifyContent: "center",
+    alignItems: "center",
+  } as ViewStyle,
+  removeMediaBtnText: {
+    fontSize: 14,
+    color: COLORS.text,
+    fontWeight: "700",
   } as TextStyle,
 })

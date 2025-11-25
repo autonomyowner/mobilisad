@@ -4,9 +4,10 @@ import { Product } from './types'
 // Supabase storage base URL for relative image paths
 const SUPABASE_STORAGE_URL = 'https://enbrhhuubjvapadqyvds.supabase.co/storage/v1/object/public/products'
 
-// Extended product type with image
+// Extended product type with image and video
 export interface ProductWithImage extends Product {
   image_url?: string
+  video_url?: string
 }
 
 // Helper function to check if image URL is valid (exists in storage)
@@ -41,7 +42,8 @@ export const fetchAllProducts = async (): Promise<ProductWithImage[]> => {
       .from('products')
       .select(`
         *,
-        product_images(image_url, is_primary)
+        product_images(image_url, is_primary),
+        product_videos(video_url)
       `)
       .eq('in_stock', true)
       .order('created_at', { ascending: false })
@@ -59,10 +61,17 @@ export const fetchAllProducts = async (): Promise<ProductWithImage[]> => {
           ? images.find((img: any) => img.is_primary)?.image_url || images[0]?.image_url
           : undefined
 
+        const videos = product.product_videos as any[]
+        const videoUrl = Array.isArray(videos) && videos.length > 0
+          ? videos[0]?.video_url
+          : undefined
+
         return {
           ...product,
           image_url: getFullImageUrl(primaryImage),
+          video_url: videoUrl,
           product_images: undefined,
+          product_videos: undefined,
           _hasValidImage: isValidImageUrl(primaryImage),
         }
       })
@@ -80,7 +89,8 @@ export const fetchNewProducts = async (limit: number = 10): Promise<ProductWithI
       .from('products')
       .select(`
         *,
-        product_images(image_url, is_primary)
+        product_images(image_url, is_primary),
+        product_videos(video_url)
       `)
       .eq('in_stock', true)
       .eq('is_new', true)
@@ -99,10 +109,17 @@ export const fetchNewProducts = async (limit: number = 10): Promise<ProductWithI
           ? images.find((img: any) => img.is_primary)?.image_url || images[0]?.image_url
           : undefined
 
+        const videos = product.product_videos as any[]
+        const videoUrl = Array.isArray(videos) && videos.length > 0
+          ? videos[0]?.video_url
+          : undefined
+
         return {
           ...product,
           image_url: getFullImageUrl(primaryImage),
+          video_url: videoUrl,
           product_images: undefined,
+          product_videos: undefined,
           _hasValidImage: isValidImageUrl(primaryImage),
         }
       })
@@ -121,7 +138,8 @@ export const fetchSaleProducts = async (limit: number = 10): Promise<ProductWith
       .from('products')
       .select(`
         *,
-        product_images(image_url, is_primary)
+        product_images(image_url, is_primary),
+        product_videos(video_url)
       `)
       .eq('in_stock', true)
       .eq('is_promo', true)
@@ -139,10 +157,17 @@ export const fetchSaleProducts = async (limit: number = 10): Promise<ProductWith
         ? images.find((img: any) => img.is_primary)?.image_url || images[0]?.image_url
         : undefined
 
+      const videos = product.product_videos as any[]
+      const videoUrl = Array.isArray(videos) && videos.length > 0
+        ? videos[0]?.video_url
+        : undefined
+
       return {
         ...product,
         image_url: getFullImageUrl(primaryImage),
+        video_url: videoUrl,
         product_images: undefined,
+        product_videos: undefined,
       }
     }) as ProductWithImage[]
   } catch (error) {
@@ -158,7 +183,8 @@ export const fetchFournisseurProducts = async (limit: number = 20): Promise<Prod
       .from('products')
       .select(`
         *,
-        product_images(image_url, is_primary)
+        product_images(image_url, is_primary),
+        product_videos(video_url)
       `)
       .eq('in_stock', true)
       .eq('seller_category', 'fournisseur')
@@ -177,10 +203,17 @@ export const fetchFournisseurProducts = async (limit: number = 20): Promise<Prod
           ? images.find((img: any) => img.is_primary)?.image_url || images[0]?.image_url
           : undefined
 
+        const videos = product.product_videos as any[]
+        const videoUrl = Array.isArray(videos) && videos.length > 0
+          ? videos[0]?.video_url
+          : undefined
+
         return {
           ...product,
           image_url: getFullImageUrl(primaryImage),
+          video_url: videoUrl,
           product_images: undefined,
+          product_videos: undefined,
           _hasValidImage: isValidImageUrl(primaryImage),
         }
       })
@@ -202,7 +235,8 @@ export const fetchProductsByCategory = async (
       .from('products')
       .select(`
         *,
-        product_images(image_url, is_primary)
+        product_images(image_url, is_primary),
+        product_videos(video_url)
       `)
       .eq('in_stock', true)
       .eq('category', category)
@@ -220,10 +254,17 @@ export const fetchProductsByCategory = async (
         ? images.find((img: any) => img.is_primary)?.image_url || images[0]?.image_url
         : undefined
 
+      const videos = product.product_videos as any[]
+      const videoUrl = Array.isArray(videos) && videos.length > 0
+        ? videos[0]?.video_url
+        : undefined
+
       return {
         ...product,
         image_url: getFullImageUrl(primaryImage),
+        video_url: videoUrl,
         product_images: undefined,
+        product_videos: undefined,
       }
     }) as ProductWithImage[]
   } catch (error) {

@@ -42,7 +42,14 @@
       }
     ],
     "expo-build-properties",
-    "expo-router"
+    "expo-router",
+    [
+      "expo-image-picker",
+      {
+        "photosPermission": "L'application a besoin d'accéder à vos photos pour ajouter des images de produits.",
+        "cameraPermission": "L'application a besoin d'accéder à votre caméra pour prendre des photos de produits."
+      }
+    ]
   ],
   "experiments": {
     "tsconfigPaths": true,
