@@ -58,15 +58,23 @@ const REELS_DATA = [
   },
 ]
 
+interface ShopScreenProps {
+  isVisible?: boolean
+}
+
 interface ReelItemProps {
   reel: (typeof REELS_DATA)[0]
   isActive: boolean
   index: number
+  isScreenVisible: boolean
 }
 
-const ReelItem: FC<ReelItemProps> = ({ reel, isActive, index }) => {
+const ReelItem: FC<ReelItemProps> = ({ reel, isActive, index, isScreenVisible }) => {
   const videoRef = useRef<Video>(null)
   const [isPlaying, setIsPlaying] = useState(true)
+
+  // Determine if video should actually play (both active reel AND screen visible)
+  const shouldPlay = isActive && isScreenVisible
   const [showHeart, setShowHeart] = useState(false)
 
   // Animations
@@ -75,9 +83,9 @@ const ReelItem: FC<ReelItemProps> = ({ reel, isActive, index }) => {
   const fadeAnim = useRef(new Animated.Value(0)).current
   const slideAnim = useRef(new Animated.Value(50)).current
 
-  // Handle video playback based on active state
+  // Handle video playback based on active state and screen visibility
   useEffect(() => {
-    if (isActive) {
+    if (shouldPlay) {
       videoRef.current?.playAsync()
       setIsPlaying(true)
       // Animate in overlay elements
@@ -101,7 +109,7 @@ const ReelItem: FC<ReelItemProps> = ({ reel, isActive, index }) => {
       fadeAnim.setValue(0)
       slideAnim.setValue(50)
     }
-  }, [isActive, fadeAnim, slideAnim])
+  }, [shouldPlay, fadeAnim, slideAnim])
 
   const togglePlayPause = useCallback(() => {
     if (isPlaying) {
@@ -156,7 +164,7 @@ const ReelItem: FC<ReelItemProps> = ({ reel, isActive, index }) => {
           style={styles.video}
           resizeMode={ResizeMode.COVER}
           isLooping
-          shouldPlay={isActive}
+          shouldPlay={shouldPlay}
           isMuted={false}
         />
 
@@ -229,7 +237,7 @@ const ReelItem: FC<ReelItemProps> = ({ reel, isActive, index }) => {
   )
 }
 
-export const ShopScreen: FC = function ShopScreen() {
+export const ShopScreen: FC<ShopScreenProps> = function ShopScreen({ isVisible = true }) {
   const [activeIndex, setActiveIndex] = useState(0)
   const pagerRef = useRef<PagerView>(null)
 
@@ -266,7 +274,7 @@ export const ShopScreen: FC = function ShopScreen() {
       >
         {REELS_DATA.map((reel, index) => (
           <View key={reel.id} style={styles.page}>
-            <ReelItem reel={reel} isActive={index === activeIndex} index={index} />
+            <ReelItem reel={reel} isActive={index === activeIndex} index={index} isScreenVisible={isVisible} />
           </View>
         ))}
       </PagerView>

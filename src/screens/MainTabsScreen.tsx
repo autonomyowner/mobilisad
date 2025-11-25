@@ -128,7 +128,7 @@ export const MainTabsScreen: FC = function MainTabsScreen() {
           <MarketplaceScreen onNavigateToCart={handleNavigateToCart} onProductPress={handleProductPress} />
         </View>
         <View key="shop" style={styles.page}>
-          <ShopScreen />
+          <ShopScreen isVisible={currentPage === 1} />
         </View>
         <View key="cart" style={styles.page}>
           <CartScreen />

@@ -157,5 +157,6 @@ export const subscribeToProductsWithCache = () => {
   })
 }
 
-// Re-export the original subscribeToProducts if needed
+// Re-export the original subscribeToProducts and types if needed
 export { subscribeToProducts }
+export type { ProductWithImage }
