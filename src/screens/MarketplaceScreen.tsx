@@ -13,6 +13,8 @@ import {
   RefreshControl,
   ActivityIndicator,
 } from "react-native"
+import { Video, ResizeMode } from "expo-av"
+import Svg, { Path, Circle } from "react-native-svg"
 
 import { Text } from "@/components/Text"
 import { useSafeAreaInsetsStyle } from "@/utils/useSafeAreaInsetsStyle"
@@ -38,6 +40,54 @@ const COLORS = {
   textSecondary: "#8A8A8A",
   textMuted: "#5A5A5A",
   danger: "#E53935",
+}
+
+// Search Icon Component
+const SearchIcon: FC<{ size?: number; color?: string }> = ({ size = 24, color = "#FFFFFF" }) => {
+  const strokeWidth = 2.5
+  return (
+    <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
+      <Circle
+        cx="11"
+        cy="11"
+        r="7"
+        stroke={color}
+        strokeWidth={strokeWidth}
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+      <Path
+        d="M20 20L16 16"
+        stroke={color}
+        strokeWidth={strokeWidth}
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </Svg>
+  )
+}
+
+// Cart Icon Component
+const CartIcon: FC<{ size?: number; color?: string }> = ({ size = 24, color = "#FFFFFF" }) => {
+  const strokeWidth = 2.5
+  return (
+    <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
+      <Path
+        d="M6 6C6 3.79086 7.79086 2 10 2H14C16.2091 2 18 3.79086 18 6V7H20C21.1046 7 22 7.89543 22 9V20C22 21.1046 21.1046 22 20 22H4C2.89543 22 2 21.1046 2 20V9C2 7.89543 2.89543 7 4 7H6V6Z"
+        stroke={color}
+        strokeWidth={strokeWidth}
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+      <Path
+        d="M6 7V6C6 3.79086 7.79086 2 10 2H14C16.2091 2 18 3.79086 18 6V7"
+        stroke={color}
+        strokeWidth={strokeWidth}
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </Svg>
+  )
 }
 
 interface ProductCardProps {
@@ -159,6 +209,12 @@ export const MarketplaceScreen: FC<MarketplaceScreenProps> = function Marketplac
   const [newProducts, setNewProducts] = useState<ProductWithImage[]>([])
   const [saleProducts, setSaleProducts] = useState<ProductWithImage[]>([])
   const [categories, setCategories] = useState<string[]>([])
+  const videoRef = useRef<Video>(null)
+
+  // Play video on mount
+  useEffect(() => {
+    videoRef.current?.playAsync()
+  }, [])
 
   // Fetch data from Supabase
   const loadData = useCallback(async () => {
@@ -231,33 +287,28 @@ export const MarketplaceScreen: FC<MarketplaceScreenProps> = function Marketplac
           />
         }
       >
-        {/* Header */}
-        <View style={styles.header}>
-          <View>
-            <Text style={styles.brandLogo}>ZST</Text>
-            <Text style={styles.brandTagline}>MARKETPLACE</Text>
-          </View>
-          <View style={styles.headerIcons}>
+        {/* Video Advertisement Hero - Full Width */}
+        <View style={styles.videoHeroContainer}>
+          {/* Video Background */}
+          <Video
+            ref={videoRef}
+            source={require("../../assets/videos/DJwd0gEh5mS.mp4")}
+            style={styles.videoBackground}
+            resizeMode={ResizeMode.COVER}
+            isLooping
+            shouldPlay
+            isMuted
+          />
+
+          {/* Floating Icons Only */}
+          <View style={styles.floatingHeaderIcons}>
             <Pressable style={styles.iconButton}>
-              <Text style={styles.iconText}>&#128269;</Text>
+              <SearchIcon size={24} color="#FFFFFF" />
             </Pressable>
             <Pressable style={styles.iconButton} onPress={onNavigateToCart}>
-              <Text style={styles.iconText}>&#128722;</Text>
+              <CartIcon size={24} color="#FFFFFF" />
             </Pressable>
           </View>
-        </View>
-
-        {/* Hero Banner */}
-        <View style={styles.heroBanner}>
-          <View style={styles.heroContent}>
-            <Text style={styles.heroLabel}>NEW COLLECTION</Text>
-            <Text style={styles.heroTitle}>Premium{"\n"}Products</Text>
-            <Text style={styles.heroSubtitle}>Discover the best deals</Text>
-            <Pressable style={styles.heroButton}>
-              <Text style={styles.heroButtonText}>EXPLORE NOW</Text>
-            </Pressable>
-          </View>
-          <View style={styles.heroAccent} />
         </View>
 
         {/* Categories */}
@@ -358,131 +409,37 @@ const styles = StyleSheet.create({
     paddingBottom: 20,
   } as ViewStyle,
 
-  // Header
-  header: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    paddingHorizontal: 20,
-    paddingTop: 16,
-    paddingBottom: 12,
+  // Video Hero Container - Full Width
+  videoHeroContainer: {
+    width: SCREEN_WIDTH,
+    height: 300,
+    position: "relative",
+    overflow: "hidden",
+    marginTop: -20,
   } as ViewStyle,
 
-  brandLogo: {
-    fontSize: 32,
-    fontWeight: "900",
-    color: COLORS.accent,
-    letterSpacing: 4,
-  } as TextStyle,
+  videoBackground: {
+    position: "absolute",
+    top: 0,
+    left: 0,
+    width: "100%",
+    height: "100%",
+  } as ViewStyle,
 
-  brandTagline: {
-    fontSize: 9,
-    fontWeight: "600",
-    color: COLORS.textSecondary,
-    letterSpacing: 3,
-    marginTop: -2,
-  } as TextStyle,
-
-  headerIcons: {
+  // Floating Icons Over Video
+  floatingHeaderIcons: {
+    position: "absolute",
+    top: 30,
+    right: 20,
     flexDirection: "row",
-    gap: 8,
+    gap: 16,
+    zIndex: 100,
   } as ViewStyle,
 
   iconButton: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    backgroundColor: COLORS.surface,
+    padding: 8,
     justifyContent: "center",
     alignItems: "center",
-  } as ViewStyle,
-
-  iconText: {
-    fontSize: 20,
-  } as TextStyle,
-
-  cartBadge: {
-    position: "absolute",
-    top: -4,
-    right: -4,
-    backgroundColor: COLORS.danger,
-    borderRadius: 10,
-    minWidth: 18,
-    height: 18,
-    justifyContent: "center",
-    alignItems: "center",
-    zIndex: 1,
-  } as ViewStyle,
-
-  cartBadgeText: {
-    fontSize: 10,
-    fontWeight: "700",
-    color: COLORS.text,
-  } as TextStyle,
-
-  // Hero Banner
-  heroBanner: {
-    marginHorizontal: 20,
-    marginTop: 8,
-    height: 200,
-    borderRadius: 24,
-    backgroundColor: COLORS.surface,
-    overflow: "hidden",
-    position: "relative",
-  } as ViewStyle,
-
-  heroContent: {
-    flex: 1,
-    padding: 24,
-    justifyContent: "center",
-  } as ViewStyle,
-
-  heroLabel: {
-    fontSize: 10,
-    fontWeight: "700",
-    color: COLORS.accent,
-    letterSpacing: 2,
-    marginBottom: 8,
-  } as TextStyle,
-
-  heroTitle: {
-    fontSize: 28,
-    fontWeight: "800",
-    color: COLORS.text,
-    lineHeight: 34,
-    marginBottom: 8,
-  } as TextStyle,
-
-  heroSubtitle: {
-    fontSize: 13,
-    color: COLORS.textSecondary,
-    marginBottom: 16,
-  } as TextStyle,
-
-  heroButton: {
-    backgroundColor: COLORS.accent,
-    paddingHorizontal: 24,
-    paddingVertical: 12,
-    borderRadius: 8,
-    alignSelf: "flex-start",
-  } as ViewStyle,
-
-  heroButtonText: {
-    fontSize: 12,
-    fontWeight: "700",
-    color: COLORS.background,
-    letterSpacing: 1,
-  } as TextStyle,
-
-  heroAccent: {
-    position: "absolute",
-    right: -40,
-    top: -40,
-    width: 200,
-    height: 200,
-    borderRadius: 100,
-    backgroundColor: COLORS.accent,
-    opacity: 0.15,
   } as ViewStyle,
 
   // Categories
