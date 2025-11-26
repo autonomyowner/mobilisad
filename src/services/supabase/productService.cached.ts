@@ -14,8 +14,13 @@ import {
   fetchFournisseurProducts as fetchFournisseurProductsOriginal,
   fetchProductsByCategory as fetchProductsByCategoryOriginal,
   fetchProductCategories as fetchProductCategoriesOriginal,
+  fetchProductsPaginated as fetchProductsPaginatedOriginal,
+  fetchFournisseurProductsPaginated as fetchFournisseurProductsPaginatedOriginal,
+  fetchProductsByCategoryPaginated as fetchProductsByCategoryPaginatedOriginal,
+  searchProductsPaginated as searchProductsPaginatedOriginal,
   subscribeToProducts,
   ProductWithImage,
+  PaginatedProducts,
 } from "./productService"
 
 // Cache durations (in milliseconds)
@@ -26,6 +31,16 @@ const CACHE_DURATIONS = {
   FOURNISSEUR_PRODUCTS: 5 * 60 * 1000, // 5 minutes
   CATEGORY_PRODUCTS: 5 * 60 * 1000, // 5 minutes per category
   CATEGORIES: 30 * 60 * 1000, // 30 minutes - rarely changes
+  PAGINATED_PRODUCTS: 3 * 60 * 1000, // 3 minutes for paginated queries
+  SEARCH_RESULTS: 2 * 60 * 1000, // 2 minutes for search results
+}
+
+// Default empty paginated result
+const EMPTY_PAGINATED: PaginatedProducts = {
+  products: [],
+  totalCount: 0,
+  hasMore: false,
+  nextPage: 0,
 }
 
 /**
@@ -157,6 +172,77 @@ export const subscribeToProductsWithCache = () => {
   })
 }
 
+// ============================================
+// PAGINATED CACHED FUNCTIONS (SCALABLE)
+// ============================================
+
+/**
+ * Fetch products with pagination and caching
+ * Best for infinite scroll - caches each page separately
+ */
+export const fetchProductsPaginated = async (
+  page: number = 0,
+  pageSize: number = 20
+): Promise<PaginatedProducts> => {
+  const cached = await getCached(
+    `products:paginated:${page}:${pageSize}`,
+    () => fetchProductsPaginatedOriginal(page, pageSize),
+    { ttl: CACHE_DURATIONS.PAGINATED_PRODUCTS }
+  )
+
+  return cached ?? EMPTY_PAGINATED
+}
+
+/**
+ * Fetch fournisseur products with pagination and caching
+ */
+export const fetchFournisseurProductsPaginated = async (
+  page: number = 0,
+  pageSize: number = 20
+): Promise<PaginatedProducts> => {
+  const cached = await getCached(
+    `products:fournisseur:paginated:${page}:${pageSize}`,
+    () => fetchFournisseurProductsPaginatedOriginal(page, pageSize),
+    { ttl: CACHE_DURATIONS.PAGINATED_PRODUCTS }
+  )
+
+  return cached ?? EMPTY_PAGINATED
+}
+
+/**
+ * Fetch products by category with pagination and caching
+ */
+export const fetchProductsByCategoryPaginated = async (
+  category: string,
+  page: number = 0,
+  pageSize: number = 20
+): Promise<PaginatedProducts> => {
+  const cached = await getCached(
+    `products:category:${category}:paginated:${page}:${pageSize}`,
+    () => fetchProductsByCategoryPaginatedOriginal(category, page, pageSize),
+    { ttl: CACHE_DURATIONS.CATEGORY_PRODUCTS }
+  )
+
+  return cached ?? EMPTY_PAGINATED
+}
+
+/**
+ * Search products with pagination and caching
+ */
+export const searchProductsPaginated = async (
+  query: string,
+  page: number = 0,
+  pageSize: number = 20
+): Promise<PaginatedProducts> => {
+  const cached = await getCached(
+    `products:search:${query}:${page}:${pageSize}`,
+    () => searchProductsPaginatedOriginal(query, page, pageSize),
+    { ttl: CACHE_DURATIONS.SEARCH_RESULTS }
+  )
+
+  return cached ?? EMPTY_PAGINATED
+}
+
 // Re-export the original subscribeToProducts and types if needed
 export { subscribeToProducts }
-export type { ProductWithImage }
+export type { ProductWithImage, PaginatedProducts }

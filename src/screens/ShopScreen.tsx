@@ -394,7 +394,7 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     height: 300,
-    backgroundColor: "rgba(0,0,0,0.5)",
+    backgroundColor: "transparent",
   } as ViewStyle,
 
   // Pause overlay
@@ -524,7 +524,7 @@ const styles = StyleSheet.create({
   // Swipe hint
   swipeHint: {
     position: "absolute",
-    bottom: 100,
+    bottom: 120,
     left: 0,
     right: 0,
     alignItems: "center",

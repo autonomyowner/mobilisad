@@ -121,6 +121,50 @@ const BackIcon: FC<{ size?: number; color?: string }> = ({ size = 24, color = "#
   )
 }
 
+// ZST Logo Component - Matching MARKETPLACE style
+const ZSTLogo: FC = () => {
+  return (
+    <View style={zstLogoStyles.container}>
+      <Text style={zstLogoStyles.logoText}>ZST</Text>
+      <View style={zstLogoStyles.taglineContainer}>
+        <View style={zstLogoStyles.taglineLine} />
+        <Text style={zstLogoStyles.taglineText}>MARKETPLACE</Text>
+        <View style={zstLogoStyles.taglineLine} />
+      </View>
+    </View>
+  )
+}
+
+const zstLogoStyles = StyleSheet.create({
+  container: {
+    alignItems: "flex-start",
+  } as ViewStyle,
+  logoText: {
+    fontSize: 24,
+    fontWeight: "600",
+    color: "rgba(255, 255, 255, 0.5)",
+    letterSpacing: 4,
+  } as TextStyle,
+  taglineContainer: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginTop: 2,
+    gap: 4,
+  } as ViewStyle,
+  taglineLine: {
+    width: 8,
+    height: 1,
+    backgroundColor: COLORS.accent,
+    opacity: 0.6,
+  } as ViewStyle,
+  taglineText: {
+    fontSize: 7,
+    fontWeight: "600",
+    color: "rgba(255, 255, 255, 0.5)",
+    letterSpacing: 2,
+  } as TextStyle,
+})
+
 interface ProductCardProps {
   product: ProductWithImage
   compact?: boolean
@@ -433,14 +477,22 @@ export const MarketplaceScreen: FC<MarketplaceScreenProps> = function Marketplac
             isMuted
           />
 
-          {/* Floating Icons Only */}
-          <View style={styles.floatingHeaderIcons}>
-            <Pressable style={styles.iconButton} onPress={() => setSearchVisible(true)}>
-              <SearchIcon size={22} color="#FFFFFF" />
-            </Pressable>
-            <Pressable style={styles.iconButton} onPress={onNavigateToCart}>
-              <CartIcon size={22} color="#FFFFFF" />
-            </Pressable>
+          {/* Floating Header with Logo and Icons */}
+          <View style={styles.floatingHeader}>
+            {/* ZST Logo - Top Left */}
+            <View style={styles.logoContainer}>
+              <ZSTLogo />
+            </View>
+
+            {/* Icons - Top Right */}
+            <View style={styles.floatingHeaderIcons}>
+              <Pressable style={styles.iconButton} onPress={() => setSearchVisible(true)}>
+                <SearchIcon size={22} color="#FFFFFF" />
+              </Pressable>
+              <Pressable style={styles.iconButton} onPress={onNavigateToCart}>
+                <CartIcon size={22} color="#FFFFFF" />
+              </Pressable>
+            </View>
           </View>
         </View>
 
@@ -684,14 +736,30 @@ const styles = StyleSheet.create({
     height: "100%",
   } as ViewStyle,
 
-  // Floating Icons Over Video
-  floatingHeaderIcons: {
+  // Floating Header Over Video
+  floatingHeader: {
     position: "absolute",
     top: 16,
+    left: 16,
     right: 16,
     flexDirection: "row",
-    gap: 10,
+    justifyContent: "space-between",
+    alignItems: "flex-start",
     zIndex: 100,
+  } as ViewStyle,
+
+  logoContainer: {
+    backgroundColor: "rgba(0, 0, 0, 0.35)",
+    borderRadius: 12,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderWidth: 1,
+    borderColor: "rgba(255, 255, 255, 0.1)",
+  } as ViewStyle,
+
+  floatingHeaderIcons: {
+    flexDirection: "row",
+    gap: 10,
   } as ViewStyle,
 
   iconButton: {

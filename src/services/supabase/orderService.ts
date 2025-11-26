@@ -136,11 +136,23 @@ export interface CustomerOrderItem {
 }
 
 // Fetch orders for a customer by phone number (for guest orders)
+// OPTIMIZED: Uses JOIN instead of N+1 queries
 export const fetchCustomerOrdersByPhone = async (phone: string): Promise<CustomerOrder[]> => {
   try {
+    // Single query with JOIN - fetches orders and items together
     const { data: orders, error } = await supabase
       .from('orders')
-      .select('*')
+      .select(`
+        *,
+        order_items (
+          id,
+          product_name,
+          product_image,
+          quantity,
+          price,
+          subtotal
+        )
+      `)
       .eq('customer_phone', phone)
       .order('created_at', { ascending: false })
 
@@ -149,27 +161,19 @@ export const fetchCustomerOrdersByPhone = async (phone: string): Promise<Custome
       return []
     }
 
-    // Fetch items for each order
-    const ordersWithItems: CustomerOrder[] = await Promise.all(
-      (orders || []).map(async (order) => {
-        const { data: items } = await supabase
-          .from('order_items')
-          .select('*')
-          .eq('order_id', order.id)
-
-        return {
-          ...order,
-          items: (items || []).map(item => ({
-            id: item.id,
-            product_name: item.product_name,
-            product_image: item.product_image,
-            quantity: item.quantity,
-            price: item.price,
-            subtotal: item.subtotal,
-          }))
-        }
-      })
-    )
+    // Transform the joined data
+    const ordersWithItems: CustomerOrder[] = (orders || []).map(order => ({
+      ...order,
+      items: (order.order_items || []).map((item: any) => ({
+        id: item.id,
+        product_name: item.product_name,
+        product_image: item.product_image,
+        quantity: item.quantity,
+        price: item.price,
+        subtotal: item.subtotal,
+      })),
+      order_items: undefined, // Remove the nested object
+    }))
 
     return ordersWithItems
   } catch (error) {
@@ -179,11 +183,23 @@ export const fetchCustomerOrdersByPhone = async (phone: string): Promise<Custome
 }
 
 // Fetch orders for authenticated user by user_id
+// OPTIMIZED: Uses JOIN instead of N+1 queries
 export const fetchCustomerOrdersByUserId = async (userId: string): Promise<CustomerOrder[]> => {
   try {
+    // Single query with JOIN - fetches orders and items together
     const { data: orders, error } = await supabase
       .from('orders')
-      .select('*')
+      .select(`
+        *,
+        order_items (
+          id,
+          product_name,
+          product_image,
+          quantity,
+          price,
+          subtotal
+        )
+      `)
       .eq('user_id', userId)
       .order('created_at', { ascending: false })
 
@@ -192,27 +208,19 @@ export const fetchCustomerOrdersByUserId = async (userId: string): Promise<Custo
       return []
     }
 
-    // Fetch items for each order
-    const ordersWithItems: CustomerOrder[] = await Promise.all(
-      (orders || []).map(async (order) => {
-        const { data: items } = await supabase
-          .from('order_items')
-          .select('*')
-          .eq('order_id', order.id)
-
-        return {
-          ...order,
-          items: (items || []).map(item => ({
-            id: item.id,
-            product_name: item.product_name,
-            product_image: item.product_image,
-            quantity: item.quantity,
-            price: item.price,
-            subtotal: item.subtotal,
-          }))
-        }
-      })
-    )
+    // Transform the joined data
+    const ordersWithItems: CustomerOrder[] = (orders || []).map(order => ({
+      ...order,
+      items: (order.order_items || []).map((item: any) => ({
+        id: item.id,
+        product_name: item.product_name,
+        product_image: item.product_image,
+        quantity: item.quantity,
+        price: item.price,
+        subtotal: item.subtotal,
+      })),
+      order_items: undefined, // Remove the nested object
+    }))
 
     return ordersWithItems
   } catch (error) {

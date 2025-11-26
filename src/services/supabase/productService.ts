@@ -10,6 +10,17 @@ export interface ProductWithImage extends Product {
   video_url?: string
 }
 
+// Pagination result type for scalable product fetching
+export interface PaginatedProducts {
+  products: ProductWithImage[]
+  totalCount: number
+  hasMore: boolean
+  nextPage: number
+}
+
+// Default page size for pagination
+const DEFAULT_PAGE_SIZE = 20
+
 // Helper function to check if image URL is valid (exists in storage)
 const isValidImageUrl = (imageUrl: string | undefined): boolean => {
   if (!imageUrl) return false
@@ -311,4 +322,231 @@ export const subscribeToProducts = (onUpdate: (payload: any) => void) => {
     .subscribe()
 
   return subscription
+}
+
+// Helper function to transform product data
+const transformProduct = (product: any): ProductWithImage & { _hasValidImage: boolean } => {
+  const images = product.product_images as any[]
+  const primaryImage = Array.isArray(images)
+    ? images.find((img: any) => img.is_primary)?.image_url || images[0]?.image_url
+    : undefined
+
+  const videos = product.product_videos as any[]
+  const videoUrl = Array.isArray(videos) && videos.length > 0
+    ? videos[0]?.video_url
+    : undefined
+
+  return {
+    ...product,
+    image_url: getFullImageUrl(primaryImage),
+    video_url: videoUrl,
+    product_images: undefined,
+    product_videos: undefined,
+    _hasValidImage: isValidImageUrl(primaryImage),
+  }
+}
+
+// ============================================
+// PAGINATED FETCHING FUNCTIONS (SCALABLE)
+// ============================================
+
+// Fetch products with pagination (for infinite scroll)
+export const fetchProductsPaginated = async (
+  page: number = 0,
+  pageSize: number = DEFAULT_PAGE_SIZE
+): Promise<PaginatedProducts> => {
+  try {
+    const from = page * pageSize
+    const to = from + pageSize - 1
+
+    // Get total count first
+    const { count: totalCount } = await supabase
+      .from('products')
+      .select('*', { count: 'exact', head: true })
+      .eq('in_stock', true)
+
+    // Fetch paginated products
+    const { data: products, error } = await supabase
+      .from('products')
+      .select(`
+        *,
+        product_images(image_url, is_primary),
+        product_videos(video_url)
+      `)
+      .eq('in_stock', true)
+      .order('created_at', { ascending: false })
+      .range(from, to)
+
+    if (error) {
+      console.error('Error fetching paginated products:', error)
+      throw error
+    }
+
+    const transformedProducts = (products || [])
+      .map(transformProduct)
+      .filter(product => product._hasValidImage) as ProductWithImage[]
+
+    return {
+      products: transformedProducts,
+      totalCount: totalCount || 0,
+      hasMore: (from + transformedProducts.length) < (totalCount || 0),
+      nextPage: page + 1,
+    }
+  } catch (error) {
+    console.error('Error in fetchProductsPaginated:', error)
+    return { products: [], totalCount: 0, hasMore: false, nextPage: 0 }
+  }
+}
+
+// Fetch fournisseur products with pagination (for customers)
+export const fetchFournisseurProductsPaginated = async (
+  page: number = 0,
+  pageSize: number = DEFAULT_PAGE_SIZE
+): Promise<PaginatedProducts> => {
+  try {
+    const from = page * pageSize
+    const to = from + pageSize - 1
+
+    // Get total count
+    const { count: totalCount } = await supabase
+      .from('products')
+      .select('*', { count: 'exact', head: true })
+      .eq('in_stock', true)
+      .eq('seller_category', 'fournisseur')
+
+    // Fetch paginated products
+    const { data: products, error } = await supabase
+      .from('products')
+      .select(`
+        *,
+        product_images(image_url, is_primary),
+        product_videos(video_url)
+      `)
+      .eq('in_stock', true)
+      .eq('seller_category', 'fournisseur')
+      .order('created_at', { ascending: false })
+      .range(from, to)
+
+    if (error) {
+      console.error('Error fetching paginated fournisseur products:', error)
+      throw error
+    }
+
+    const transformedProducts = (products || [])
+      .map(transformProduct)
+      .filter(product => product._hasValidImage) as ProductWithImage[]
+
+    return {
+      products: transformedProducts,
+      totalCount: totalCount || 0,
+      hasMore: (from + transformedProducts.length) < (totalCount || 0),
+      nextPage: page + 1,
+    }
+  } catch (error) {
+    console.error('Error in fetchFournisseurProductsPaginated:', error)
+    return { products: [], totalCount: 0, hasMore: false, nextPage: 0 }
+  }
+}
+
+// Fetch products by category with pagination
+export const fetchProductsByCategoryPaginated = async (
+  category: string,
+  page: number = 0,
+  pageSize: number = DEFAULT_PAGE_SIZE
+): Promise<PaginatedProducts> => {
+  try {
+    const from = page * pageSize
+    const to = from + pageSize - 1
+
+    // Get total count
+    const { count: totalCount } = await supabase
+      .from('products')
+      .select('*', { count: 'exact', head: true })
+      .eq('in_stock', true)
+      .eq('category', category)
+
+    // Fetch paginated products
+    const { data: products, error } = await supabase
+      .from('products')
+      .select(`
+        *,
+        product_images(image_url, is_primary),
+        product_videos(video_url)
+      `)
+      .eq('in_stock', true)
+      .eq('category', category)
+      .order('created_at', { ascending: false })
+      .range(from, to)
+
+    if (error) {
+      console.error('Error fetching paginated category products:', error)
+      throw error
+    }
+
+    const transformedProducts = (products || [])
+      .map(transformProduct)
+      .filter(product => product._hasValidImage) as ProductWithImage[]
+
+    return {
+      products: transformedProducts,
+      totalCount: totalCount || 0,
+      hasMore: (from + transformedProducts.length) < (totalCount || 0),
+      nextPage: page + 1,
+    }
+  } catch (error) {
+    console.error('Error in fetchProductsByCategoryPaginated:', error)
+    return { products: [], totalCount: 0, hasMore: false, nextPage: 0 }
+  }
+}
+
+// Search products with pagination
+export const searchProductsPaginated = async (
+  query: string,
+  page: number = 0,
+  pageSize: number = DEFAULT_PAGE_SIZE
+): Promise<PaginatedProducts> => {
+  try {
+    const from = page * pageSize
+    const to = from + pageSize - 1
+    const searchPattern = `%${query}%`
+
+    // Get total count
+    const { count: totalCount } = await supabase
+      .from('products')
+      .select('*', { count: 'exact', head: true })
+      .eq('in_stock', true)
+      .or(`name.ilike.${searchPattern},brand.ilike.${searchPattern},category.ilike.${searchPattern}`)
+
+    // Fetch paginated products
+    const { data: products, error } = await supabase
+      .from('products')
+      .select(`
+        *,
+        product_images(image_url, is_primary),
+        product_videos(video_url)
+      `)
+      .eq('in_stock', true)
+      .or(`name.ilike.${searchPattern},brand.ilike.${searchPattern},category.ilike.${searchPattern}`)
+      .order('created_at', { ascending: false })
+      .range(from, to)
+
+    if (error) {
+      console.error('Error searching products:', error)
+      throw error
+    }
+
+    const transformedProducts = (products || [])
+      .map(transformProduct)
+      .filter(product => product._hasValidImage) as ProductWithImage[]
+
+    return {
+      products: transformedProducts,
+      totalCount: totalCount || 0,
+      hasMore: (from + transformedProducts.length) < (totalCount || 0),
+      nextPage: page + 1,
+    }
+  } catch (error) {
+    console.error('Error in searchProductsPaginated:', error)
+    return { products: [], totalCount: 0, hasMore: false, nextPage: 0 }
+  }
 }

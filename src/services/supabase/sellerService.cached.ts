@@ -22,6 +22,7 @@ import {
   SellerProduct,
   NewProductInput,
 } from "./sellerService"
+import { OrderStatus } from "./types"
 
 // Cache durations (in milliseconds)
 const CACHE_DURATIONS = {
@@ -102,7 +103,7 @@ export const fetchSellerProducts = async (sellerId: string): Promise<SellerProdu
  */
 export const updateOrderStatusWithCache = async (
   orderId: string,
-  status: string,
+  status: OrderStatus,
   sellerId: string
 ): Promise<{ success: boolean; error?: string }> => {
   const result = await updateOrderStatus(orderId, status)
@@ -125,7 +126,7 @@ export const deleteProductWithCache = async (
   productId: string,
   sellerId: string
 ): Promise<{ success: boolean; error?: string }> => {
-  const result = await deleteProduct(productId)
+  const result = await deleteProduct(productId, sellerId)
 
   if (result.success) {
     // Invalidate seller and product caches after delete

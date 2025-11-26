@@ -1,6 +1,7 @@
 import { supabase } from './client'
 import { SellerCategory, OrderStatus, PaymentStatus } from './types'
 import { Alert } from 'react-native'
+import { compressProductImage, validateVideo } from '@/utils/mediaCompression'
 
 // Seller stats type
 export interface SellerStats {
@@ -210,6 +211,7 @@ const generateSlug = (name: string): string => {
 }
 
 // Upload image to Supabase Storage (React Native compatible)
+// OPTIMIZED: Compresses images before upload to save bandwidth
 const uploadImage = async (
   uri: string,
   productId: string,
@@ -218,21 +220,26 @@ const uploadImage = async (
   try {
     console.log('uploadImage called with:', { uri, productId, sellerId })
 
-    // Create a unique filename
-    const fileExt = uri.split('.').pop()?.toLowerCase() || 'jpg'
-    const fileName = `${sellerId}/${productId}/image-${Date.now()}.${fileExt}`
+    // COMPRESSION: Compress image before upload
+    console.log('Compressing image...')
+    const compressed = await compressProductImage(uri)
+    const imageUri = compressed.uri
+    console.log(`Compression complete: ${compressed.compressionRatio?.toFixed(1) || 0}% reduction`)
+
+    // Create a unique filename (always jpeg after compression)
+    const fileName = `${sellerId}/${productId}/image-${Date.now()}.jpg`
     console.log('Uploading to path:', fileName)
 
     // For React Native, we need to use FormData and ArrayBuffer approach
-    const response = await fetch(uri)
+    const response = await fetch(imageUri)
     console.log('Fetch response status:', response.status)
 
     const arrayBuffer = await response.arrayBuffer()
-    console.log('ArrayBuffer size:', arrayBuffer.byteLength, 'bytes')
+    console.log('ArrayBuffer size:', arrayBuffer.byteLength, 'bytes', `(${(arrayBuffer.byteLength / 1024).toFixed(1)}KB)`)
 
-    // Check file size (max 5MB)
+    // Check file size (max 5MB - should be much smaller after compression)
     if (arrayBuffer.byteLength > 5 * 1024 * 1024) {
-      return { success: false, error: 'Image size must be less than 5MB' }
+      return { success: false, error: 'Image size must be less than 5MB even after compression' }
     }
 
     // Upload to Supabase Storage using ArrayBuffer (React Native compatible)
@@ -240,7 +247,7 @@ const uploadImage = async (
     const { data, error } = await supabase.storage
       .from('products')
       .upload(fileName, arrayBuffer, {
-        contentType: `image/${fileExt}`,
+        contentType: 'image/jpeg',
         upsert: false,
       })
 
@@ -266,6 +273,7 @@ const uploadImage = async (
 }
 
 // Upload video to Supabase Storage (React Native compatible)
+// OPTIMIZED: Validates video size before upload
 const uploadVideo = async (
   uri: string,
   productId: string,
@@ -273,6 +281,15 @@ const uploadVideo = async (
 ): Promise<{ success: boolean; url?: string; storagePath?: string; fileSize?: number; error?: string }> => {
   try {
     console.log('uploadVideo called with:', { uri, productId, sellerId })
+
+    // VALIDATION: Check video size before upload
+    console.log('Validating video...')
+    const validation = await validateVideo(uri, { maxSizeMB: 10 })
+    if (!validation.isValid) {
+      console.error('Video validation failed:', validation.error)
+      return { success: false, error: validation.error }
+    }
+    console.log(`Video validation passed: ${(validation.fileSize / 1024 / 1024).toFixed(2)}MB`)
 
     // Create a unique filename
     const fileExt = uri.split('.').pop()?.toLowerCase() || 'mp4'
@@ -285,12 +302,7 @@ const uploadVideo = async (
 
     const arrayBuffer = await response.arrayBuffer()
     const fileSize = arrayBuffer.byteLength
-    console.log('Video ArrayBuffer size:', fileSize, 'bytes')
-
-    // Check file size (max 10MB)
-    if (fileSize > 10 * 1024 * 1024) {
-      return { success: false, error: 'Video size must be less than 10MB' }
-    }
+    console.log('Video ArrayBuffer size:', fileSize, 'bytes', `(${(fileSize / 1024 / 1024).toFixed(2)}MB)`)
 
     // Upload to Supabase Storage using ArrayBuffer
     console.log('Starting video upload to Supabase...')
