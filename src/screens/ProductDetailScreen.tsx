@@ -45,16 +45,27 @@ const COLORS = {
 
 interface ProductDetailScreenProps {
   product: ProductWithImage
+  initialQuantity?: number
+  cartItemId?: string
   onBack: () => void
+  onCancel?: () => void
 }
 
-export const ProductDetailScreen: FC<ProductDetailScreenProps> = ({ product, onBack }) => {
+export const ProductDetailScreen: FC<ProductDetailScreenProps> = ({
+  product,
+  initialQuantity = 1,
+  cartItemId,
+  onBack,
+  onCancel
+}) => {
   const $topInsets = useSafeAreaInsetsStyle(["top"])
   const $bottomInsets = useSafeAreaInsetsStyle(["bottom"])
   const { user, isAuthenticated } = useAuth()
 
-  const [quantity, setQuantity] = useState(1)
-  const [showOrderForm, setShowOrderForm] = useState(false)
+  const isFromCart = !!cartItemId
+  const [quantity, setQuantity] = useState(initialQuantity)
+  // Show order form directly when coming from cart
+  const [showOrderForm, setShowOrderForm] = useState(isFromCart)
   const [isSubmitting, setIsSubmitting] = useState(false)
 
   // Order form state
@@ -169,7 +180,7 @@ export const ProductDetailScreen: FC<ProductDetailScreenProps> = ({ product, onB
           showsVerticalScrollIndicator={false}
         >
           {/* Back Button */}
-          <TouchableOpacity style={styles.backButton} onPress={onBack}>
+          <TouchableOpacity style={styles.backButton} onPress={onCancel || onBack}>
             <Text style={styles.backButtonText}>← Retour</Text>
           </TouchableOpacity>
 

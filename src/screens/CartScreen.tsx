@@ -25,6 +25,7 @@ import {
   subscribeToCart,
   CartItem,
 } from "@/services/supabase/cartService"
+import { ProductWithImage } from "@/services/supabase/productService"
 
 const COLORS = {
   background: "#0D0D0D",
@@ -89,13 +90,19 @@ const MinusIcon: FC<{ size?: number; color?: string }> = ({ size = 16, color = "
   )
 }
 
+interface CartScreenProps {
+  isVisible?: boolean
+  onCheckoutItem?: (product: ProductWithImage, quantity: number, cartItemId: string) => void
+}
+
 interface CartItemCardProps {
   item: CartItem
   onUpdateQuantity: (id: string, quantity: number) => void
   onRemove: (id: string) => void
+  onCheckout: (item: CartItem) => void
 }
 
-const CartItemCard: FC<CartItemCardProps> = ({ item, onUpdateQuantity, onRemove }) => {
+const CartItemCard: FC<CartItemCardProps> = ({ item, onUpdateQuantity, onRemove, onCheckout }) => {
   const scaleAnim = useRef(new Animated.Value(1)).current
 
   const handleRemove = () => {
@@ -111,7 +118,7 @@ const CartItemCard: FC<CartItemCardProps> = ({ item, onUpdateQuantity, onRemove 
   return (
     <Animated.View style={[styles.cartItemCard, { transform: [{ scale: scaleAnim }] }]}>
       {/* Product Image */}
-      <View style={styles.cartItemImageContainer}>
+      <Pressable style={styles.cartItemImageContainer} onPress={() => onCheckout(item)}>
         {item.product_image ? (
           <Image
             source={{ uri: item.product_image }}
@@ -125,10 +132,10 @@ const CartItemCard: FC<CartItemCardProps> = ({ item, onUpdateQuantity, onRemove 
             </Text>
           </View>
         )}
-      </View>
+      </Pressable>
 
       {/* Product Info */}
-      <View style={styles.cartItemInfo}>
+      <Pressable style={styles.cartItemInfo} onPress={() => onCheckout(item)}>
         <Text style={styles.cartItemName} numberOfLines={2}>
           {item.product_name}
         </Text>
@@ -152,30 +159,36 @@ const CartItemCard: FC<CartItemCardProps> = ({ item, onUpdateQuantity, onRemove 
             <PlusIcon size={14} color={COLORS.text} />
           </Pressable>
         </View>
-      </View>
+      </Pressable>
 
       {/* Remove Button */}
       <Pressable style={styles.removeButton} onPress={handleRemove}>
         <TrashIcon size={18} color={COLORS.danger} />
       </Pressable>
 
-      {/* Item Total */}
+      {/* Item Total and Checkout Button */}
       <View style={styles.itemTotalContainer}>
-        <Text style={styles.itemTotalLabel}>Total</Text>
-        <Text style={styles.itemTotalPrice}>
-          {(item.product_price * item.quantity).toLocaleString('fr-DZ')} DA
-        </Text>
+        <View style={styles.itemTotalLeft}>
+          <Text style={styles.itemTotalLabel}>Total</Text>
+          <Text style={styles.itemTotalPrice}>
+            {(item.product_price * item.quantity).toLocaleString('fr-DZ')} DA
+          </Text>
+        </View>
+        <Pressable style={styles.itemCheckoutButton} onPress={() => onCheckout(item)}>
+          <Text style={styles.itemCheckoutButtonText}>Commander</Text>
+        </Pressable>
       </View>
     </Animated.View>
   )
 }
 
-export const CartScreen: FC = function CartScreen() {
+export const CartScreen: FC<CartScreenProps> = function CartScreen({ isVisible = false, onCheckoutItem }) {
   const $topInsets = useSafeAreaInsetsStyle(["top"])
   const { user } = useAuth()
   const [cartItems, setCartItems] = useState<CartItem[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [refreshing, setRefreshing] = useState(false)
+  const hasLoadedOnce = useRef(false)
 
   // Load cart items
   const loadCartItems = useCallback(async () => {
@@ -193,6 +206,7 @@ export const CartScreen: FC = function CartScreen() {
   useEffect(() => {
     if (user) {
       loadCartItems()
+      hasLoadedOnce.current = true
       const subscription = subscribeToCart(setCartItems)
       return () => subscription.unsubscribe()
     } else {
@@ -200,6 +214,13 @@ export const CartScreen: FC = function CartScreen() {
     }
     return undefined
   }, [user, loadCartItems])
+
+  // Reload cart when tab becomes visible
+  useEffect(() => {
+    if (isVisible && user && hasLoadedOnce.current) {
+      loadCartItems()
+    }
+  }, [isVisible, user, loadCartItems])
 
   const onRefresh = useCallback(async () => {
     setRefreshing(true)
@@ -233,8 +254,34 @@ export const CartScreen: FC = function CartScreen() {
     await clearCart()
   }
 
+  const handleCheckoutItem = (item: CartItem) => {
+    if (onCheckoutItem) {
+      // Create a ProductWithImage object from CartItem
+      const product: ProductWithImage = {
+        id: item.product_id,
+        name: item.product_name,
+        slug: item.product_id, // Use product_id as slug for cart items
+        price: item.product_price,
+        image_url: item.product_image,
+        brand: '',
+        category: '',
+        description: undefined,
+        original_price: undefined,
+        is_new: false,
+        is_promo: false,
+        in_stock: true,
+        rating: undefined,
+        viewers_count: undefined,
+        video_url: undefined,
+        seller_id: undefined,
+        created_at: item.created_at,
+        updated_at: item.updated_at,
+      }
+      onCheckoutItem(product, item.quantity, item.id)
+    }
+  }
+
   // Calculate totals
-  const subtotal = cartItems.reduce((sum, item) => sum + (item.product_price * item.quantity), 0)
   const itemCount = cartItems.reduce((sum, item) => sum + item.quantity, 0)
 
   if (!user) {
@@ -307,29 +354,20 @@ export const CartScreen: FC = function CartScreen() {
                 item={item}
                 onUpdateQuantity={handleUpdateQuantity}
                 onRemove={handleRemoveItem}
+                onCheckout={handleCheckoutItem}
               />
             ))}
-            <View style={{ height: 200 }} />
+            <View style={{ height: 120 }} />
           </ScrollView>
 
-          {/* Bottom Summary */}
-          <View style={styles.summaryContainer}>
-            <View style={styles.summaryRow}>
-              <Text style={styles.summaryLabel}>Items ({itemCount})</Text>
-              <Text style={styles.summaryValue}>
-                {subtotal.toLocaleString('fr-DZ')} DA
-              </Text>
-            </View>
-            <View style={styles.summaryDivider} />
-            <View style={styles.summaryRow}>
-              <Text style={styles.totalLabel}>Total</Text>
-              <Text style={styles.totalValue}>
-                {subtotal.toLocaleString('fr-DZ')} DA
-              </Text>
-            </View>
-            <Pressable style={styles.checkoutButton}>
-              <Text style={styles.checkoutButtonText}>Proceed to Checkout</Text>
-            </Pressable>
+          {/* Bottom Info */}
+          <View style={styles.bottomInfoContainer}>
+            <Text style={styles.bottomInfoText}>
+              {itemCount} {itemCount === 1 ? 'article' : 'articles'} dans votre panier
+            </Text>
+            <Text style={styles.bottomInfoSubtext}>
+              Cliquez sur "Commander" pour passer votre commande
+            </Text>
           </View>
         </>
       )}
@@ -495,6 +533,10 @@ const styles = StyleSheet.create({
     alignItems: "center",
   } as ViewStyle,
 
+  itemTotalLeft: {
+    flexDirection: "column",
+  } as ViewStyle,
+
   itemTotalLabel: {
     fontSize: 12,
     color: COLORS.textSecondary,
@@ -506,66 +548,43 @@ const styles = StyleSheet.create({
     color: COLORS.text,
   } as TextStyle,
 
-  // Summary
-  summaryContainer: {
+  itemCheckoutButton: {
+    backgroundColor: COLORS.accent,
+    borderRadius: 10,
+    paddingVertical: 10,
+    paddingHorizontal: 20,
+  } as ViewStyle,
+
+  itemCheckoutButtonText: {
+    fontSize: 14,
+    fontWeight: "700",
+    color: COLORS.background,
+  } as TextStyle,
+
+  // Bottom Info
+  bottomInfoContainer: {
     position: "absolute",
     bottom: 0,
     left: 0,
     right: 0,
     backgroundColor: COLORS.surface,
-    borderTopLeftRadius: 24,
-    borderTopRightRadius: 24,
-    padding: 20,
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    padding: 16,
     paddingBottom: 100,
-  } as ViewStyle,
-
-  summaryRow: {
-    flexDirection: "row",
-    justifyContent: "space-between",
     alignItems: "center",
-    marginBottom: 8,
   } as ViewStyle,
 
-  summaryLabel: {
-    fontSize: 14,
-    color: COLORS.textSecondary,
-  } as TextStyle,
-
-  summaryValue: {
+  bottomInfoText: {
     fontSize: 14,
     fontWeight: "600",
     color: COLORS.text,
+    marginBottom: 4,
   } as TextStyle,
 
-  summaryDivider: {
-    height: 1,
-    backgroundColor: "rgba(255, 255, 255, 0.1)",
-    marginVertical: 12,
-  } as ViewStyle,
-
-  totalLabel: {
-    fontSize: 18,
-    fontWeight: "700",
-    color: COLORS.text,
-  } as TextStyle,
-
-  totalValue: {
-    fontSize: 20,
-    fontWeight: "800",
-    color: COLORS.accent,
-  } as TextStyle,
-
-  checkoutButton: {
-    backgroundColor: COLORS.accent,
-    borderRadius: 12,
-    paddingVertical: 16,
-    alignItems: "center",
-    marginTop: 16,
-  } as ViewStyle,
-
-  checkoutButtonText: {
-    fontSize: 16,
-    fontWeight: "700",
-    color: COLORS.background,
+  bottomInfoSubtext: {
+    fontSize: 12,
+    color: COLORS.textSecondary,
+    textAlign: "center",
   } as TextStyle,
 })

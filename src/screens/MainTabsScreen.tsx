@@ -1,4 +1,4 @@
-import { FC, useRef, useState } from "react"
+import { FC, useRef, useState, useEffect, useCallback } from "react"
 import {
   View,
   StyleSheet,
@@ -19,6 +19,7 @@ import { ProductWithImage } from "@/services/supabase/productService"
 import { TabIcon } from "@/components/TabIcon"
 import { useAuth } from "@/context/AuthContext"
 import { useRealtimeOrders } from "@/hooks/useRealtimeOrders"
+import { getCartItemCount, cartEvents, removeFromCart } from "@/services/supabase/cartService"
 
 const COLORS = {
   background: "#0D0D0D",
@@ -37,11 +38,17 @@ const TABS = [
   { key: "profile", label: "Profile", iconName: "profile" as const },
 ]
 
+interface SelectedProductState {
+  product: ProductWithImage
+  initialQuantity?: number
+  cartItemId?: string
+}
+
 export const MainTabsScreen: FC = function MainTabsScreen() {
   const insets = useSafeAreaInsets()
   const pagerRef = useRef<PagerView>(null)
   const [currentPage, setCurrentPage] = useState(0)
-  const [selectedProduct, setSelectedProduct] = useState<ProductWithImage | null>(null)
+  const [selectedProduct, setSelectedProduct] = useState<SelectedProductState | null>(null)
 
   // Get authenticated user
   const { user } = useAuth()
@@ -51,6 +58,32 @@ export const MainTabsScreen: FC = function MainTabsScreen() {
     sellerId: user?.id || '',
     enabled: !!user?.id && user?.role === 'seller',
   })
+
+  // Cart item count for badge
+  const [cartCount, setCartCount] = useState(0)
+
+  const loadCartCount = useCallback(async () => {
+    if (user) {
+      const count = await getCartItemCount()
+      setCartCount(count)
+    } else {
+      setCartCount(0)
+    }
+  }, [user])
+
+  // Load cart count and subscribe to changes
+  useEffect(() => {
+    if (user) {
+      loadCartCount()
+      const unsubscribe = cartEvents.subscribe(() => {
+        loadCartCount()
+      })
+      return unsubscribe
+    } else {
+      setCartCount(0)
+    }
+    return undefined
+  }, [user, loadCartCount])
 
   // Animation values for each tab
   const scaleAnims = useRef(
@@ -96,10 +129,23 @@ export const MainTabsScreen: FC = function MainTabsScreen() {
   }
 
   const handleProductPress = (product: ProductWithImage) => {
-    setSelectedProduct(product)
+    setSelectedProduct({ product })
   }
 
-  const handleBackFromProduct = () => {
+  const handleCartCheckoutItem = (product: ProductWithImage, quantity: number, cartItemId: string) => {
+    setSelectedProduct({ product, initialQuantity: quantity, cartItemId })
+  }
+
+  const handleBackFromProduct = async () => {
+    // If this was a cart checkout and order was placed, remove item from cart
+    if (selectedProduct?.cartItemId) {
+      await removeFromCart(selectedProduct.cartItemId)
+    }
+    setSelectedProduct(null)
+  }
+
+  const handleCancelFromProduct = () => {
+    // Just go back without removing from cart
     setSelectedProduct(null)
   }
 
@@ -107,8 +153,11 @@ export const MainTabsScreen: FC = function MainTabsScreen() {
   if (selectedProduct) {
     return (
       <ProductDetailScreen
-        product={selectedProduct}
+        product={selectedProduct.product}
+        initialQuantity={selectedProduct.initialQuantity}
+        cartItemId={selectedProduct.cartItemId}
         onBack={handleBackFromProduct}
+        onCancel={handleCancelFromProduct}
       />
     )
   }
@@ -131,7 +180,7 @@ export const MainTabsScreen: FC = function MainTabsScreen() {
           <ShopScreen isVisible={currentPage === 1} />
         </View>
         <View key="cart" style={styles.page}>
-          <CartScreen />
+          <CartScreen isVisible={currentPage === 2} onCheckoutItem={handleCartCheckoutItem} />
         </View>
         <View key="dashboard" style={styles.page}>
           <DashboardScreen />
@@ -164,7 +213,8 @@ export const MainTabsScreen: FC = function MainTabsScreen() {
                   active={currentPage === index}
                   size={22}
                   color={currentPage === index ? COLORS.iconActive : COLORS.iconInactive}
-                  badge={tab.key === 'dashboard' ? pendingCount : undefined}
+                  badge={tab.key === 'dashboard' ? pendingCount : tab.key === 'freelance' ? cartCount : undefined}
+                  badgeColor={tab.key === 'freelance' ? '#22C55E' : '#D4A84B'}
                 />
               </Animated.View>
             </Pressable>
