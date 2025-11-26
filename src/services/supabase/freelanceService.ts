@@ -1,50 +1,82 @@
-import { supabase } from './client'
+import { supabase } from "./client"
 
-// Types for freelance services
-export type ExperienceLevel = 'beginner' | 'intermediate' | 'expert'
-export type PriceType = 'fixed' | 'hourly' | 'project'
-export type AvailabilityStatus = 'available' | 'busy' | 'unavailable'
+// Types matching the actual database schema
+export type ExperienceLevel = "Débutant" | "Intermédiaire" | "Expert"
+export type PriceType = "fixed" | "hourly" | "starting-at"
+export type AvailabilityStatus = "available" | "busy" | "unavailable"
+export type ServiceCategory =
+  | "Développement Web"
+  | "Design Graphique"
+  | "Montage Vidéo"
+  | "Marketing Digital"
+  | "Rédaction"
+  | "Photographie"
+  | "Traduction"
+  | "Consultation"
 
-export interface ServiceCategory {
-  id: string
-  name: string
-  description?: string
-  slug: string
-}
+// All available categories as an array for filtering UI
+export const SERVICE_CATEGORIES: ServiceCategory[] = [
+  "Développement Web",
+  "Design Graphique",
+  "Montage Vidéo",
+  "Marketing Digital",
+  "Rédaction",
+  "Photographie",
+  "Traduction",
+  "Consultation",
+]
 
 export interface FreelanceService {
   id: string
-  title: string
-  description: string
-  category_id: string
-  category?: ServiceCategory
-  seller_id: string
-  seller_name?: string
+  slug: string
+  provider_id: string
+  service_title: string
+  category: ServiceCategory
+  experience_level: ExperienceLevel
+  rating: number
+  reviews_count: number
+  completed_projects: number
+  response_time: string
   price: number
   price_type: PriceType
-  experience_level: ExperienceLevel
+  description: string
+  short_description: string
+  skills: string[]
+  delivery_time: string
+  revisions: string
+  languages: string[]
   availability: AvailabilityStatus
-  delivery_time?: string
-  rating?: number
-  reviews_count?: number
-  image_url?: string
+  featured: boolean
+  verified: boolean
+  top_rated: boolean
+  video_url?: string
   created_at: string
   updated_at: string
+  // Joined data
+  provider?: {
+    id: string
+    full_name: string
+    provider_avatar?: string
+  }
 }
 
 // Fetch all freelance services
 export const fetchFreelanceServices = async (): Promise<FreelanceService[]> => {
   try {
     const { data: services, error } = await supabase
-      .from('freelance_services')
-      .select('*')
-      .eq('availability', 'available')
-      .order('created_at', { ascending: false })
+      .from("freelance_services")
+      .select(
+        `
+        *,
+        provider:user_profiles!freelance_services_provider_id_fkey(id, full_name, provider_avatar)
+      `
+      )
+      .eq("availability", "available")
+      .order("created_at", { ascending: false })
 
     if (error) {
-      console.error('Error fetching freelance services:', error)
-      // Return empty array if table doesn't exist yet
-      if (error.code === '42P01') {
+      console.error("Error fetching freelance services:", error)
+      if (error.code === "42P01") {
         return []
       }
       throw error
@@ -52,26 +84,31 @@ export const fetchFreelanceServices = async (): Promise<FreelanceService[]> => {
 
     return services || []
   } catch (error) {
-    console.error('Error in fetchFreelanceServices:', error)
+    console.error("Error in fetchFreelanceServices:", error)
     return []
   }
 }
 
 // Fetch freelance services by category
 export const fetchFreelanceServicesByCategory = async (
-  categoryId: string
+  category: ServiceCategory
 ): Promise<FreelanceService[]> => {
   try {
     const { data: services, error } = await supabase
-      .from('freelance_services')
-      .select('*')
-      .eq('category_id', categoryId)
-      .eq('availability', 'available')
-      .order('created_at', { ascending: false })
+      .from("freelance_services")
+      .select(
+        `
+        *,
+        provider:user_profiles!freelance_services_provider_id_fkey(id, full_name, provider_avatar)
+      `
+      )
+      .eq("category", category)
+      .eq("availability", "available")
+      .order("created_at", { ascending: false })
 
     if (error) {
-      console.error('Error fetching services by category:', error)
-      if (error.code === '42P01') {
+      console.error("Error fetching services by category:", error)
+      if (error.code === "42P01") {
         return []
       }
       throw error
@@ -79,7 +116,7 @@ export const fetchFreelanceServicesByCategory = async (
 
     return services || []
   } catch (error) {
-    console.error('Error in fetchFreelanceServicesByCategory:', error)
+    console.error("Error in fetchFreelanceServicesByCategory:", error)
     return []
   }
 }
@@ -90,14 +127,19 @@ export const fetchFreelanceServiceById = async (
 ): Promise<FreelanceService | null> => {
   try {
     const { data: service, error } = await supabase
-      .from('freelance_services')
-      .select('*')
-      .eq('id', serviceId)
+      .from("freelance_services")
+      .select(
+        `
+        *,
+        provider:user_profiles!freelance_services_provider_id_fkey(id, full_name, provider_avatar)
+      `
+      )
+      .eq("id", serviceId)
       .single()
 
     if (error) {
-      console.error('Error fetching service by id:', error)
-      if (error.code === '42P01') {
+      console.error("Error fetching service by id:", error)
+      if (error.code === "42P01") {
         return null
       }
       throw error
@@ -105,44 +147,26 @@ export const fetchFreelanceServiceById = async (
 
     return service
   } catch (error) {
-    console.error('Error in fetchFreelanceServiceById:', error)
+    console.error("Error in fetchFreelanceServiceById:", error)
     return null
   }
 }
 
-// Get all service categories
+// Get all service categories (returns the static enum array)
 export const getServiceCategories = async (): Promise<ServiceCategory[]> => {
-  try {
-    const { data: categories, error } = await supabase
-      .from('service_categories')
-      .select('*')
-      .order('name', { ascending: true })
-
-    if (error) {
-      console.error('Error fetching service categories:', error)
-      if (error.code === '42P01') {
-        return []
-      }
-      throw error
-    }
-
-    return categories || []
-  } catch (error) {
-    console.error('Error in getServiceCategories:', error)
-    return []
-  }
+  return SERVICE_CATEGORIES
 }
 
 // Subscribe to freelance services updates
-export const subscribeToFreelanceServices = (onUpdate: (payload: any) => void) => {
+export const subscribeToFreelanceServices = (onUpdate: (payload: unknown) => void) => {
   const subscription = supabase
-    .channel('freelance-services-channel')
+    .channel("freelance-services-channel")
     .on(
-      'postgres_changes',
+      "postgres_changes",
       {
-        event: '*',
-        schema: 'public',
-        table: 'freelance_services',
+        event: "*",
+        schema: "public",
+        table: "freelance_services",
       },
       onUpdate
     )

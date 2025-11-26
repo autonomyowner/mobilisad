@@ -8,6 +8,7 @@ interface TabIconProps {
   size?: number
   color?: string
   badge?: number
+  badgeColor?: string
 }
 
 export const TabIcon: React.FC<TabIconProps> = ({
@@ -16,6 +17,7 @@ export const TabIcon: React.FC<TabIconProps> = ({
   size = 24,
   color = "#FFFFFF",
   badge,
+  badgeColor = "#D4A84B",
 }) => {
   // Refined thin stroke for elegant minimal look
   const strokeWidth = active ? 2 : 1.5
@@ -191,7 +193,7 @@ export const TabIcon: React.FC<TabIconProps> = ({
     <View style={{ width: size, height: size }}>
       {renderIcon()}
       {badge !== undefined && badge > 0 && (
-        <View style={styles.badgeContainer}>
+        <View style={[styles.badgeContainer, { backgroundColor: badgeColor }]}>
           <Text style={styles.badgeText}>{badge > 99 ? '99+' : badge}</Text>
         </View>
       )}

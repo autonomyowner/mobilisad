@@ -41,6 +41,7 @@ import {
 import { fetchProductCategories } from "@/services/supabase/productService.cached"
 import { getProductCategories } from "@/services/supabase/sellerService"
 import { B2BMarketplaceScreen } from "./B2BMarketplaceScreen"
+import { FreelanceOffersScreen } from "./FreelanceOffersScreen"
 import { canBuyInB2B, canSellInB2B } from "@/services/supabase/b2bService"
 
 const { width: SCREEN_WIDTH } = Dimensions.get("window")
@@ -547,6 +548,7 @@ export const DashboardScreen: FC = function DashboardScreen() {
   const [refreshing, setRefreshing] = useState(false)
   const [showAddProduct, setShowAddProduct] = useState(false)
   const [showB2BMarketplace, setShowB2BMarketplace] = useState(false)
+  const [showFreelanceOffers, setShowFreelanceOffers] = useState(false)
 
   const isSeller = user?.role === "seller" || user?.role === "admin"
   const userCategory = user?.seller_category || "fournisseur"
@@ -679,6 +681,13 @@ export const DashboardScreen: FC = function DashboardScreen() {
     )
   }
 
+  // Show Freelance Offers if selected
+  if (showFreelanceOffers) {
+    return (
+      <FreelanceOffersScreen onBack={() => setShowFreelanceOffers(false)} />
+    )
+  }
+
   return (
     <View style={[styles.container, $topInsets]}>
       {/* B2B Banner - Only for Grossistes and Fournisseurs */}
@@ -712,10 +721,21 @@ export const DashboardScreen: FC = function DashboardScreen() {
         </TouchableOpacity>
       )}
 
-      {/* Header */}
+      {/* Header with Freelancers CTA */}
       <View style={styles.header}>
-        <Text style={styles.greeting}>Bonjour,</Text>
-        <Text style={styles.userName}>{user?.full_name || "Vendeur"}</Text>
+        <View style={styles.headerContent}>
+          <View>
+            <Text style={styles.greeting}>Bonjour,</Text>
+            <Text style={styles.userName}>{user?.full_name || "Vendeur"}</Text>
+          </View>
+          <TouchableOpacity
+            style={styles.freelancersCta}
+            onPress={() => setShowFreelanceOffers(true)}
+            activeOpacity={0.8}
+          >
+            <Text style={styles.freelancersCtaText}>Freelancers</Text>
+          </TouchableOpacity>
+        </View>
       </View>
 
       {/* Tabs */}
@@ -923,6 +943,11 @@ const styles = StyleSheet.create({
     paddingTop: 8,
     paddingBottom: 12,
   } as ViewStyle,
+  headerContent: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+  } as ViewStyle,
   greeting: {
     fontSize: 13,
     color: COLORS.textSecondary,
@@ -933,6 +958,19 @@ const styles = StyleSheet.create({
     fontSize: 24,
     fontWeight: "700",
     color: COLORS.text,
+  } as TextStyle,
+  freelancersCta: {
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    backgroundColor: COLORS.goldMuted,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: COLORS.goldDark,
+  } as ViewStyle,
+  freelancersCtaText: {
+    fontSize: 14,
+    fontWeight: "600",
+    color: COLORS.gold,
   } as TextStyle,
 
   // Tabs

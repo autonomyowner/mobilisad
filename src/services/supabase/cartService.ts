@@ -1,5 +1,8 @@
 import { supabase } from './client'
 import { ProductWithImage } from './productService'
+import { cartEvents } from './cartEvents'
+
+export { cartEvents }
 
 export interface CartItem {
   id: string
@@ -99,6 +102,7 @@ export const addToCart = async (
       }
     }
 
+    cartEvents.emit()
     return { success: true }
   } catch (err) {
     console.error('Error adding to cart:', err)
@@ -131,6 +135,7 @@ export const updateCartItemQuantity = async (
       return { success: false, error: error.message }
     }
 
+    cartEvents.emit()
     return { success: true }
   } catch (err) {
     console.error('Error updating cart item:', err)
@@ -153,6 +158,7 @@ export const removeFromCart = async (cartItemId: string): Promise<{ success: boo
       return { success: false, error: error.message }
     }
 
+    cartEvents.emit()
     return { success: true }
   } catch (err) {
     console.error('Error removing from cart:', err)
@@ -180,6 +186,7 @@ export const clearCart = async (): Promise<{ success: boolean; error?: string }>
       return { success: false, error: error.message }
     }
 
+    cartEvents.emit()
     return { success: true }
   } catch (err) {
     console.error('Error clearing cart:', err)

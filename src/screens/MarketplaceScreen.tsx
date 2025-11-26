@@ -137,31 +137,30 @@ const ZSTLogo: FC = () => {
 
 const zstLogoStyles = StyleSheet.create({
   container: {
-    alignItems: "flex-start",
+    alignItems: "center",
   } as ViewStyle,
   logoText: {
-    fontSize: 24,
-    fontWeight: "600",
-    color: "rgba(255, 255, 255, 0.5)",
-    letterSpacing: 4,
+    fontSize: 28,
+    fontWeight: "700",
+    color: "#FFFFFF",
+    letterSpacing: 6,
   } as TextStyle,
   taglineContainer: {
     flexDirection: "row",
     alignItems: "center",
-    marginTop: 2,
+    marginTop: 3,
     gap: 4,
   } as ViewStyle,
   taglineLine: {
-    width: 8,
+    width: 10,
     height: 1,
     backgroundColor: COLORS.accent,
-    opacity: 0.6,
   } as ViewStyle,
   taglineText: {
-    fontSize: 7,
+    fontSize: 8,
     fontWeight: "600",
-    color: "rgba(255, 255, 255, 0.5)",
-    letterSpacing: 2,
+    color: "rgba(255, 255, 255, 0.6)",
+    letterSpacing: 3,
   } as TextStyle,
 })
 
@@ -174,13 +173,17 @@ interface ProductCardProps {
   onWishlistToggle?: (product: ProductWithImage) => void
 }
 
+// Consistent card width calculation
+const CARD_WIDTH = (SCREEN_WIDTH - 48) / 2
+const HORIZONTAL_CARD_WIDTH = SCREEN_WIDTH * 0.42
+
 const ProductCard: FC<ProductCardProps> = ({ product, compact, horizontal, onPress, isInWishlist, onWishlistToggle }) => {
   const scaleAnim = useRef(new Animated.Value(1)).current
   const heartAnim = useRef(new Animated.Value(1)).current
 
   const handlePressIn = () => {
     Animated.spring(scaleAnim, {
-      toValue: 0.96,
+      toValue: 0.97,
       useNativeDriver: true,
     }).start()
   }
@@ -188,7 +191,7 @@ const ProductCard: FC<ProductCardProps> = ({ product, compact, horizontal, onPre
   const handlePressOut = () => {
     Animated.spring(scaleAnim, {
       toValue: 1,
-      friction: 3,
+      friction: 4,
       useNativeDriver: true,
     }).start()
   }
@@ -200,7 +203,6 @@ const ProductCard: FC<ProductCardProps> = ({ product, compact, horizontal, onPre
   }
 
   const handleWishlistPress = () => {
-    // Animate the heart
     Animated.sequence([
       Animated.timing(heartAnim, {
         toValue: 1.3,
@@ -224,18 +226,20 @@ const ProductCard: FC<ProductCardProps> = ({ product, compact, horizontal, onPre
     ? Math.round(((product.original_price - product.price) / product.original_price) * 100)
     : 0
 
-  // Determine card style based on props
-  const getCardStyle = () => {
-    if (compact) return styles.productCardCompact
-    if (horizontal) return styles.productCardHorizontal
-    return styles.productCard
+  // Format price consistently
+  const formatPrice = (price: number) => {
+    return price.toLocaleString('fr-DZ')
   }
+
+  // Card width based on context
+  const cardWidth = horizontal ? HORIZONTAL_CARD_WIDTH : "100%"
 
   return (
     <Pressable onPressIn={handlePressIn} onPressOut={handlePressOut} onPress={handlePress}>
       <Animated.View
         style={[
-          getCardStyle(),
+          styles.productCard,
+          horizontal && styles.productCardHorizontal,
           { transform: [{ scale: scaleAnim }] },
         ]}
       >
@@ -256,13 +260,13 @@ const ProductCard: FC<ProductCardProps> = ({ product, compact, horizontal, onPre
             />
           ) : (
             <View style={styles.imagePlaceholder}>
-              <Text style={styles.imagePlaceholderText}>{product.name.charAt(0)}</Text>
+              <Text style={styles.imagePlaceholderText}>{product.name.charAt(0).toUpperCase()}</Text>
             </View>
           )}
         </View>
 
         {/* Wishlist Button */}
-        <Pressable style={styles.wishlistButton} onPress={handleWishlistPress}>
+        <Pressable style={styles.wishlistButton} onPress={handleWishlistPress} hitSlop={8}>
           <Animated.View style={{ transform: [{ scale: heartAnim }] }}>
             <Text style={[styles.wishlistIcon, isInWishlist && styles.wishlistIconActive]}>
               {isInWishlist ? '\u2665' : '\u2661'}
@@ -272,27 +276,40 @@ const ProductCard: FC<ProductCardProps> = ({ product, compact, horizontal, onPre
 
         {/* Product Info */}
         <View style={styles.productInfo}>
-          {/* Rating */}
-          {product.rating && (
-            <View style={styles.ratingContainer}>
-              <Text style={styles.starIcon}>&#9733;</Text>
-              <Text style={styles.ratingText}>{product.rating.toFixed(1)}</Text>
-              <Text style={styles.reviewsText}>({product.viewers_count})</Text>
-            </View>
-          )}
+          {/* Brand */}
+          <Text style={styles.brandText} numberOfLines={1}>
+            {product.brand || "ZST"}
+          </Text>
 
-          <Text style={styles.brandText}>{product.brand}</Text>
-          <Text style={styles.productName} numberOfLines={1}>
+          {/* Product Name */}
+          <Text style={styles.productName} numberOfLines={2}>
             {product.name}
           </Text>
 
           {/* Price */}
           <View style={styles.priceContainer}>
-            <Text style={styles.productPrice}>{product.price.toLocaleString('fr-DZ')} DA</Text>
+            <Text style={styles.productPrice} numberOfLines={1}>
+              {formatPrice(product.price)} DA
+            </Text>
             {product.original_price && product.original_price > product.price && (
-              <Text style={styles.originalPrice}>{product.original_price.toLocaleString('fr-DZ')} DA</Text>
+              <Text style={styles.originalPrice} numberOfLines={1}>
+                {formatPrice(product.original_price)}
+              </Text>
             )}
           </View>
+
+          {/* Rating */}
+          {product.rating ? (
+            <View style={styles.ratingRow}>
+              <View style={styles.ratingContainer}>
+                <Text style={styles.starIcon}>&#9733;</Text>
+                <Text style={styles.ratingText}>{product.rating.toFixed(1)}</Text>
+                {product.viewers_count ? (
+                  <Text style={styles.reviewsText}>({product.viewers_count})</Text>
+                ) : null}
+              </View>
+            </View>
+          ) : null}
         </View>
       </Animated.View>
     </Pressable>
@@ -469,7 +486,7 @@ export const MarketplaceScreen: FC<MarketplaceScreenProps> = function Marketplac
           {/* Video Background */}
           <Video
             ref={videoRef}
-            source={require("../../assets/videos/DJwd0gEh5mS.mp4")}
+            source={require("../../assets/videos/1heromobilis (1)4mb.mp4")}
             style={styles.videoBackground}
             resizeMode={ResizeMode.COVER}
             isLooping
@@ -739,8 +756,8 @@ const styles = StyleSheet.create({
   // Floating Header Over Video
   floatingHeader: {
     position: "absolute",
-    top: 16,
-    left: 16,
+    top: 20,
+    left: 20,
     right: 16,
     flexDirection: "row",
     justifyContent: "space-between",
@@ -749,12 +766,6 @@ const styles = StyleSheet.create({
   } as ViewStyle,
 
   logoContainer: {
-    backgroundColor: "rgba(0, 0, 0, 0.35)",
-    borderRadius: 12,
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    borderWidth: 1,
-    borderColor: "rgba(255, 255, 255, 0.1)",
   } as ViewStyle,
 
   floatingHeaderIcons: {
@@ -860,43 +871,32 @@ const styles = StyleSheet.create({
     marginBottom: 16,
   } as ViewStyle,
 
-  // Product Card
+  // Product Card - Consistent Base Style
   productCard: {
     width: "100%",
     backgroundColor: COLORS.surface,
-    borderRadius: 16,
+    borderRadius: 12,
     overflow: "hidden",
   } as ViewStyle,
 
   productCardHorizontal: {
-    width: SCREEN_WIDTH * 0.44,
-    backgroundColor: COLORS.surface,
-    borderRadius: 16,
-    overflow: "hidden",
-    marginRight: 14,
-  } as ViewStyle,
-
-  productCardCompact: {
-    width: SCREEN_WIDTH * 0.38,
-    backgroundColor: COLORS.surface,
-    borderRadius: 16,
-    overflow: "hidden",
-    marginRight: 14,
+    width: HORIZONTAL_CARD_WIDTH,
+    marginRight: 12,
   } as ViewStyle,
 
   discountBadge: {
     position: "absolute",
-    top: 10,
-    left: 10,
+    top: 8,
+    left: 8,
     backgroundColor: COLORS.danger,
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    borderRadius: 12,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 6,
     zIndex: 10,
   } as ViewStyle,
 
   discountText: {
-    fontSize: 11,
+    fontSize: 10,
     fontWeight: "700",
     color: COLORS.text,
   } as TextStyle,
@@ -916,17 +916,17 @@ const styles = StyleSheet.create({
     position: "absolute",
     top: 8,
     right: 8,
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    backgroundColor: COLORS.text,
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: "rgba(255, 255, 255, 0.95)",
     justifyContent: "center",
     alignItems: "center",
     zIndex: 10,
   } as ViewStyle,
 
   wishlistIcon: {
-    fontSize: 18,
+    fontSize: 16,
     color: COLORS.background,
   } as TextStyle,
 
@@ -935,62 +935,75 @@ const styles = StyleSheet.create({
   } as TextStyle,
 
   productInfo: {
-    padding: 12,
+    padding: 10,
+    minHeight: 110,
+  } as ViewStyle,
+
+  ratingRow: {
+    marginTop: 4,
+    marginBottom: 6,
   } as ViewStyle,
 
   ratingContainer: {
     flexDirection: "row",
     alignItems: "center",
-    marginBottom: 6,
+  } as ViewStyle,
+
+  ratingPlaceholder: {
+    height: 16,
   } as ViewStyle,
 
   starIcon: {
-    fontSize: 12,
+    fontSize: 11,
     color: COLORS.accent,
   } as TextStyle,
 
   ratingText: {
-    fontSize: 11,
+    fontSize: 10,
     fontWeight: "600",
     color: COLORS.text,
-    marginLeft: 4,
+    marginLeft: 3,
   } as TextStyle,
 
   reviewsText: {
-    fontSize: 10,
+    fontSize: 9,
     color: COLORS.textMuted,
     marginLeft: 2,
   } as TextStyle,
 
   brandText: {
-    fontSize: 10,
+    fontSize: 9,
+    fontWeight: "500",
     color: COLORS.textSecondary,
-    marginBottom: 2,
+    textTransform: "uppercase",
+    letterSpacing: 0.5,
   } as TextStyle,
 
   productName: {
-    fontSize: 14,
-    fontWeight: "700",
+    fontSize: 13,
+    fontWeight: "600",
     color: COLORS.text,
-    marginBottom: 8,
+    lineHeight: 17,
+    marginBottom: 6,
   } as TextStyle,
 
   priceContainer: {
     flexDirection: "row",
     alignItems: "center",
+    flexWrap: "wrap",
+    gap: 4,
   } as ViewStyle,
 
   productPrice: {
-    fontSize: 16,
-    fontWeight: "800",
+    fontSize: 14,
+    fontWeight: "700",
     color: COLORS.accent,
   } as TextStyle,
 
   originalPrice: {
-    fontSize: 12,
+    fontSize: 11,
     color: COLORS.textMuted,
     textDecorationLine: "line-through",
-    marginLeft: 6,
   } as TextStyle,
 
   imagePlaceholder: {
@@ -1001,7 +1014,7 @@ const styles = StyleSheet.create({
   } as ViewStyle,
 
   imagePlaceholderText: {
-    fontSize: 32,
+    fontSize: 28,
     fontWeight: "700",
     color: COLORS.accent,
   } as TextStyle,
