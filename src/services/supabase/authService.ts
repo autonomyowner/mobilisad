@@ -1,5 +1,7 @@
 import { supabase } from './client'
 import { UserProfile, UserRole } from './types'
+import * as WebBrowser from 'expo-web-browser'
+import * as AuthSession from 'expo-auth-session'
 
 export interface SignUpData {
   email: string
@@ -17,6 +19,139 @@ export interface AuthResponse {
   success: boolean
   error?: string
   user?: UserProfile
+}
+
+// Helper to extract OAuth params from URL
+const extractParamsFromUrl = (url: string) => {
+  try {
+    const parsedUrl = new URL(url)
+    const hash = parsedUrl.hash.substring(1) // Remove the leading '#'
+    const params = new URLSearchParams(hash)
+
+    return {
+      access_token: params.get('access_token'),
+      refresh_token: params.get('refresh_token'),
+      expires_in: parseInt(params.get('expires_in') || '0'),
+      token_type: params.get('token_type'),
+      provider_token: params.get('provider_token'),
+    }
+  } catch {
+    return null
+  }
+}
+
+// Sign in with Google OAuth
+export const signInWithGoogle = async (): Promise<AuthResponse> => {
+  try {
+    // Complete any pending auth session
+    WebBrowser.maybeCompleteAuthSession()
+
+    // Create redirect URL for the app
+    const expRedirectUrl = AuthSession.makeRedirectUri({
+      scheme: 'zst',
+      path: 'google-auth',
+    })
+
+    console.log('OAuth redirect URL:', expRedirectUrl)
+
+    // Start OAuth flow with Supabase
+    const { data, error } = await supabase.auth.signInWithOAuth({
+      provider: 'google',
+      options: {
+        redirectTo: expRedirectUrl,
+        skipBrowserRedirect: true,
+        queryParams: {
+          prompt: 'select_account',
+        },
+      },
+    })
+
+    if (error) {
+      console.error('OAuth init error:', error)
+      return { success: false, error: error.message }
+    }
+
+    if (!data.url) {
+      return { success: false, error: 'No OAuth URL returned' }
+    }
+
+    // Open the browser for authentication
+    const result = await WebBrowser.openAuthSessionAsync(
+      data.url,
+      expRedirectUrl,
+      {
+        showInRecents: true,
+        // For Android, this helps with the redirect
+        createTask: false,
+      }
+    )
+
+    console.log('OAuth browser result:', result)
+
+    if (result.type === 'success' && result.url) {
+      // Extract tokens from the callback URL
+      const params = extractParamsFromUrl(result.url)
+
+      if (params?.access_token && params?.refresh_token) {
+        // Set the session with the tokens
+        const { data: sessionData, error: sessionError } = await supabase.auth.setSession({
+          access_token: params.access_token,
+          refresh_token: params.refresh_token,
+        })
+
+        if (sessionError) {
+          console.error('Session set error:', sessionError)
+          return { success: false, error: sessionError.message }
+        }
+
+        if (sessionData.user) {
+          // Check if profile exists, create if not
+          const { data: existingProfile } = await supabase
+            .from('user_profiles')
+            .select('*')
+            .eq('id', sessionData.user.id)
+            .single()
+
+          if (!existingProfile) {
+            // Create new profile for Google user
+            const newProfile: Omit<UserProfile, 'created_at' | 'updated_at'> = {
+              id: sessionData.user.id,
+              email: sessionData.user.email || '',
+              full_name: sessionData.user.user_metadata?.full_name || sessionData.user.user_metadata?.name,
+              avatar_url: sessionData.user.user_metadata?.avatar_url || sessionData.user.user_metadata?.picture,
+              provider_name: 'google',
+              provider_avatar: sessionData.user.user_metadata?.avatar_url || sessionData.user.user_metadata?.picture,
+              role: 'customer' as UserRole,
+            }
+
+            await supabase.from('user_profiles').insert(newProfile)
+
+            return {
+              success: true,
+              user: {
+                ...newProfile,
+                created_at: new Date().toISOString(),
+                updated_at: new Date().toISOString(),
+              },
+            }
+          }
+
+          return { success: true, user: existingProfile }
+        }
+      }
+
+      return { success: false, error: 'Failed to extract authentication tokens' }
+    }
+
+    if (result.type === 'cancel' || result.type === 'dismiss') {
+      return { success: false, error: 'Authentication cancelled' }
+    }
+
+    return { success: false, error: 'Authentication failed' }
+  } catch (error) {
+    console.error('Google sign in exception:', error)
+    return { success: false, error: 'An unexpected error occurred during Google sign in' }
+  }
 }
 
 // Sign up a new user

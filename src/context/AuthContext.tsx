@@ -4,6 +4,7 @@ import {
   signIn as authSignIn,
   signUp as authSignUp,
   signOut as authSignOut,
+  signInWithGoogle as authSignInWithGoogle,
   getCurrentProfile,
   updateProfile as authUpdateProfile,
   onAuthStateChange,
@@ -18,6 +19,7 @@ interface AuthContextType {
   isAuthenticated: boolean
   signIn: (data: SignInData) => Promise<AuthResponse>
   signUp: (data: SignUpData) => Promise<AuthResponse>
+  signInWithGoogle: () => Promise<AuthResponse>
   signOut: () => Promise<AuthResponse>
   updateProfile: (updates: Partial<Pick<UserProfile, 'full_name' | 'phone' | 'avatar_url'>>) => Promise<AuthResponse>
   refreshProfile: () => Promise<void>
@@ -85,6 +87,19 @@ export function AuthProvider({ children }: AuthProviderProps) {
     }
   }
 
+  const signInWithGoogle = async (): Promise<AuthResponse> => {
+    setIsLoading(true)
+    try {
+      const response = await authSignInWithGoogle()
+      if (response.success && response.user) {
+        setUser(response.user)
+      }
+      return response
+    } finally {
+      setIsLoading(false)
+    }
+  }
+
   const signOut = async (): Promise<AuthResponse> => {
     setIsLoading(true)
     try {
@@ -128,6 +143,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
     isAuthenticated: !!user,
     signIn,
     signUp,
+    signInWithGoogle,
     signOut,
     updateProfile,
     refreshProfile,

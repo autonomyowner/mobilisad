@@ -494,12 +494,10 @@ export const MarketplaceScreen: FC<MarketplaceScreenProps> = function Marketplac
             isMuted
           />
 
-          {/* Floating Header with Logo and Icons */}
+          {/* Floating Header with Icons */}
           <View style={styles.floatingHeader}>
-            {/* ZST Logo - Top Left */}
-            <View style={styles.logoContainer}>
-              <ZSTLogo />
-            </View>
+            {/* Spacer for left side */}
+            <View style={styles.logoContainer} />
 
             {/* Icons - Top Right */}
             <View style={styles.floatingHeaderIcons}>

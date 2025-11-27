@@ -44,11 +44,79 @@ const COLORS = {
 
 type AuthView = "signIn" | "signUp"
 
+// Google Sign In Button Component
+const GoogleSignInButton: FC<{ onPress: () => void; isLoading: boolean }> = ({ onPress, isLoading }) => (
+  <Pressable
+    onPress={onPress}
+    disabled={isLoading}
+    style={({ pressed }) => [
+      googleButtonStyles.button,
+      pressed && googleButtonStyles.buttonPressed,
+      isLoading && googleButtonStyles.buttonDisabled,
+    ]}
+  >
+    <View style={googleButtonStyles.content}>
+      <View style={googleButtonStyles.logoContainer}>
+        <Text style={googleButtonStyles.logoText}>G</Text>
+      </View>
+      {isLoading ? (
+        <ActivityIndicator color={COLORS.text} size="small" />
+      ) : (
+        <Text style={googleButtonStyles.buttonText}>Continue with Google</Text>
+      )}
+    </View>
+  </Pressable>
+)
+
+const googleButtonStyles = StyleSheet.create({
+  button: {
+    backgroundColor: COLORS.surfaceElevated,
+    borderRadius: 4,
+    borderWidth: 1,
+    borderColor: COLORS.inputBorder,
+    marginBottom: 16,
+  } as ViewStyle,
+  buttonPressed: {
+    opacity: 0.9,
+    transform: [{ scale: 0.98 }],
+  } as ViewStyle,
+  buttonDisabled: {
+    opacity: 0.6,
+  } as ViewStyle,
+  content: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    height: 56,
+    paddingHorizontal: 18,
+  } as ViewStyle,
+  logoContainer: {
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    backgroundColor: COLORS.text,
+    justifyContent: "center",
+    alignItems: "center",
+    marginRight: 12,
+  } as ViewStyle,
+  logoText: {
+    fontSize: 14,
+    fontWeight: "700",
+    color: COLORS.background,
+  } as TextStyle,
+  buttonText: {
+    fontSize: 14,
+    fontWeight: "500",
+    color: COLORS.text,
+    letterSpacing: 0.3,
+  } as TextStyle,
+})
+
 // Auth screen components - inline to avoid circular dependencies
 const AuthSignInScreen: FC<{ onNavigateToSignUp: () => void }> = ({ onNavigateToSignUp }) => {
   const $topInsets = useSafeAreaInsetsStyle(["top"])
   const $bottomInsets = useSafeAreaInsetsStyle(["bottom"])
-  const { signIn, isLoading } = useAuth()
+  const { signIn, signInWithGoogle, isLoading } = useAuth()
 
   const [email, setEmail] = useState("")
   const [password, setPassword] = useState("")
@@ -71,6 +139,14 @@ const AuthSignInScreen: FC<{ onNavigateToSignUp: () => void }> = ({ onNavigateTo
       setError(response.error || "Sign in failed")
     }
   }, [email, password, signIn])
+
+  const handleGoogleSignIn = useCallback(async () => {
+    setError("")
+    const response = await signInWithGoogle()
+    if (!response.success && response.error !== "Authentication cancelled") {
+      setError(response.error || "Google sign in failed")
+    }
+  }, [signInWithGoogle])
 
   return (
     <View style={[authStyles.container, $topInsets]}>
@@ -161,6 +237,8 @@ const AuthSignInScreen: FC<{ onNavigateToSignUp: () => void }> = ({ onNavigateTo
               <View style={authStyles.dividerLine} />
             </View>
 
+            <GoogleSignInButton onPress={handleGoogleSignIn} isLoading={isLoading} />
+
             <View style={authStyles.switchContainer}>
               <Text style={authStyles.switchText}>Don't have an account? </Text>
               <TouchableOpacity onPress={onNavigateToSignUp}>
@@ -177,7 +255,7 @@ const AuthSignInScreen: FC<{ onNavigateToSignUp: () => void }> = ({ onNavigateTo
 const AuthSignUpScreen: FC<{ onNavigateToSignIn: () => void }> = ({ onNavigateToSignIn }) => {
   const $topInsets = useSafeAreaInsetsStyle(["top"])
   const $bottomInsets = useSafeAreaInsetsStyle(["bottom"])
-  const { signUp, isLoading } = useAuth()
+  const { signUp, signInWithGoogle, isLoading } = useAuth()
 
   const [fullName, setFullName] = useState("")
   const [email, setEmail] = useState("")
@@ -209,6 +287,14 @@ const AuthSignUpScreen: FC<{ onNavigateToSignIn: () => void }> = ({ onNavigateTo
       setError(response.error || "Sign up failed")
     }
   }, [fullName, email, phone, password, confirmPassword, signUp])
+
+  const handleGoogleSignIn = useCallback(async () => {
+    setError("")
+    const response = await signInWithGoogle()
+    if (!response.success && response.error !== "Authentication cancelled") {
+      setError(response.error || "Google sign in failed")
+    }
+  }, [signInWithGoogle])
 
   return (
     <View style={[authStyles.container, $topInsets]}>
@@ -286,6 +372,8 @@ const AuthSignUpScreen: FC<{ onNavigateToSignIn: () => void }> = ({ onNavigateTo
               <Text style={authStyles.dividerText}>OR</Text>
               <View style={authStyles.dividerLine} />
             </View>
+
+            <GoogleSignInButton onPress={handleGoogleSignIn} isLoading={isLoading} />
 
             <View style={authStyles.switchContainer}>
               <Text style={authStyles.switchText}>Already have an account? </Text>
