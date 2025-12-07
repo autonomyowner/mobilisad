@@ -18,6 +18,7 @@ import {
 } from "react-native"
 import { Video, ResizeMode } from "expo-av"
 import { Text } from "@/components/Text"
+import { OrderConfirmationModal } from "@/components/OrderConfirmationModal"
 import { useSafeAreaInsetsStyle } from "@/utils/useSafeAreaInsetsStyle"
 import { ProductWithImage } from "@/services/supabase/productService"
 import { createOrder, WILAYAS, DeliveryType } from "@/services/supabase/orderService"
@@ -76,6 +77,10 @@ export const ProductDetailScreen: FC<ProductDetailScreenProps> = ({
   const [deliveryType, setDeliveryType] = useState<DeliveryType>("home")
   const [showWilayaPicker, setShowWilayaPicker] = useState(false)
 
+  // Order confirmation modal state
+  const [showConfirmation, setShowConfirmation] = useState(false)
+  const [confirmedOrderNumber, setConfirmedOrderNumber] = useState("")
+
   const totalPrice = (product.price || 0) * quantity
 
   const handleQuantityChange = (delta: number) => {
@@ -125,11 +130,9 @@ export const ProductDetailScreen: FC<ProductDetailScreenProps> = ({
     setIsSubmitting(false)
 
     if (result.success) {
-      Alert.alert(
-        "Commande confirmee",
-        `Votre commande #${result.orderNumber || result.orderId?.slice(0, 8).toUpperCase()} a ete passee avec succes. Vous serez contacte bientot.`,
-        [{ text: "OK", onPress: onBack }]
-      )
+      // Show beautiful confirmation modal instead of basic alert
+      setConfirmedOrderNumber(result.orderNumber || result.orderId?.slice(0, 8).toUpperCase() || "")
+      setShowConfirmation(true)
     } else {
       Alert.alert("Erreur", result.error || "Une erreur est survenue")
     }
@@ -404,6 +407,21 @@ export const ProductDetailScreen: FC<ProductDetailScreenProps> = ({
       </KeyboardAvoidingView>
 
       <WilayaPickerModal />
+
+      {/* Order Confirmation Modal */}
+      <OrderConfirmationModal
+        visible={showConfirmation}
+        orderNumber={confirmedOrderNumber}
+        productName={product.name}
+        quantity={quantity}
+        totalAmount={totalPrice}
+        customerName={customerName}
+        wilaya={wilaya}
+        onClose={() => {
+          setShowConfirmation(false)
+          onBack()
+        }}
+      />
     </View>
   )
 }
