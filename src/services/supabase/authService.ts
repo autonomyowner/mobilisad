@@ -281,8 +281,23 @@ export const signOut = async (): Promise<AuthResponse> => {
   }
 }
 
-// Get current user profile
+// Helper to add timeout to promises
+const withTimeout = <T>(promise: Promise<T>, ms: number, fallback: T): Promise<T> => {
+  const timeout = new Promise<T>((resolve) => {
+    setTimeout(() => {
+      console.warn(`[Auth] Request timed out after ${ms}ms`)
+      resolve(fallback)
+    }, ms)
+  })
+  return Promise.race([promise, timeout])
+}
+
+// Get current user profile with timeout protection
 export const getCurrentProfile = async (): Promise<UserProfile | null> => {
+  return withTimeout(getCurrentProfileInternal(), 8000, null)
+}
+
+const getCurrentProfileInternal = async (): Promise<UserProfile | null> => {
   try {
     const { data: { user }, error: userError } = await supabase.auth.getUser()
 
