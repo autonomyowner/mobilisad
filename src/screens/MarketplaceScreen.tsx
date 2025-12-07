@@ -25,6 +25,7 @@ import {
   fetchFournisseurProducts,
   fetchProductCategories,
   fetchAllProducts,
+  fetchFournisseurProductsPaginated,
   subscribeToProducts,
   invalidateProductCaches,
   ProductWithImage,
@@ -333,6 +334,12 @@ export const MarketplaceScreen: FC<MarketplaceScreenProps> = function Marketplac
   const [wishlistIds, setWishlistIds] = useState<string[]>([])
   const videoRef = useRef<Video>(null)
 
+  // Pagination state for Sale products
+  const [salePage, setSalePage] = useState(0)
+  const [hasMoreSale, setHasMoreSale] = useState(true)
+  const [loadingMore, setLoadingMore] = useState(false)
+  const PAGE_SIZE = 10
+
   // Search state
   const [searchVisible, setSearchVisible] = useState(false)
   const [searchQuery, setSearchQuery] = useState("")
@@ -410,9 +417,9 @@ export const MarketplaceScreen: FC<MarketplaceScreenProps> = function Marketplac
   // Fetch data from Supabase
   const loadData = useCallback(async () => {
     try {
-      const [newProds, fournisseurProds, cats, allProds] = await Promise.all([
+      const [newProds, paginatedSale, cats, allProds] = await Promise.all([
         fetchNewProducts(10),
-        fetchFournisseurProducts(20),
+        fetchFournisseurProductsPaginated(0, PAGE_SIZE),
         fetchProductCategories(),
         fetchAllProducts(),
       ])
@@ -427,13 +434,10 @@ export const MarketplaceScreen: FC<MarketplaceScreenProps> = function Marketplac
         setNewProducts(newProds)
       }
 
-      // Display products from fournisseurs in the Sale section
-      if (fournisseurProds.length === 0) {
-        // Fallback: if no fournisseur products, show all products
-        setSaleProducts(allProds.slice(0, 10))
-      } else {
-        setSaleProducts(fournisseurProds)
-      }
+      // Display products from fournisseurs in the Sale section with pagination
+      setSaleProducts(paginatedSale.products)
+      setHasMoreSale(paginatedSale.hasMore)
+      setSalePage(0)
 
       setCategories(cats)
     } catch (error) {
@@ -442,6 +446,25 @@ export const MarketplaceScreen: FC<MarketplaceScreenProps> = function Marketplac
       setIsLoading(false)
     }
   }, [])
+
+  // Load more sale products
+  const loadMoreSaleProducts = useCallback(async () => {
+    if (loadingMore || !hasMoreSale) return
+
+    setLoadingMore(true)
+    try {
+      const nextPage = salePage + 1
+      const result = await fetchFournisseurProductsPaginated(nextPage, PAGE_SIZE)
+
+      setSaleProducts(prev => [...prev, ...result.products])
+      setHasMoreSale(result.hasMore)
+      setSalePage(nextPage)
+    } catch (error) {
+      console.error('Error loading more products:', error)
+    } finally {
+      setLoadingMore(false)
+    }
+  }, [salePage, loadingMore, hasMoreSale])
 
   // Initial load
   useEffect(() => {
@@ -461,6 +484,8 @@ export const MarketplaceScreen: FC<MarketplaceScreenProps> = function Marketplac
 
   const onRefresh = useCallback(async () => {
     setRefreshing(true)
+    setSalePage(0)
+    setHasMoreSale(true)
     await invalidateProductCaches()
     await loadData()
     setRefreshing(false)
@@ -584,18 +609,35 @@ export const MarketplaceScreen: FC<MarketplaceScreenProps> = function Marketplac
               <ActivityIndicator size="small" color={COLORS.accent} />
             </View>
           ) : saleProducts.length > 0 ? (
-            <View style={styles.productsGrid}>
-              {saleProducts.map((product) => (
-                <View key={product.id} style={styles.gridItem}>
-                  <ProductCard
-                    product={product}
-                    onPress={onProductPress}
-                    isInWishlist={wishlistIds.includes(product.id)}
-                    onWishlistToggle={handleWishlistToggle}
-                  />
-                </View>
-              ))}
-            </View>
+            <>
+              <View style={styles.productsGrid}>
+                {saleProducts.map((product) => (
+                  <View key={product.id} style={styles.gridItem}>
+                    <ProductCard
+                      product={product}
+                      onPress={onProductPress}
+                      isInWishlist={wishlistIds.includes(product.id)}
+                      onWishlistToggle={handleWishlistToggle}
+                    />
+                  </View>
+                ))}
+              </View>
+
+              {/* Voir Plus Button */}
+              {hasMoreSale && (
+                <Pressable
+                  style={styles.loadMoreButton}
+                  onPress={loadMoreSaleProducts}
+                  disabled={loadingMore}
+                >
+                  {loadingMore ? (
+                    <ActivityIndicator size="small" color={COLORS.accent} />
+                  ) : (
+                    <Text style={styles.loadMoreText}>Voir Plus</Text>
+                  )}
+                </Pressable>
+              )}
+            </>
           ) : (
             <View style={styles.emptyState}>
               <Text style={styles.emptyStateText}>No products available</Text>
@@ -868,6 +910,27 @@ const styles = StyleSheet.create({
     width: (SCREEN_WIDTH - 48) / 2,
     marginBottom: 16,
   } as ViewStyle,
+
+  // Load More Button
+  loadMoreButton: {
+    marginHorizontal: 20,
+    marginTop: 8,
+    marginBottom: 16,
+    paddingVertical: 14,
+    backgroundColor: COLORS.surface,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: COLORS.accent,
+    alignItems: "center",
+    justifyContent: "center",
+  } as ViewStyle,
+
+  loadMoreText: {
+    fontSize: 14,
+    fontWeight: "600",
+    color: COLORS.accent,
+    letterSpacing: 0.5,
+  } as TextStyle,
 
   // Product Card - Consistent Base Style
   productCard: {
