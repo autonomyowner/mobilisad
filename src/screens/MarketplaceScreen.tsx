@@ -22,10 +22,9 @@ import { Text } from "@/components/Text"
 import { useSafeAreaInsetsStyle } from "@/utils/useSafeAreaInsetsStyle"
 import {
   fetchNewProducts,
-  fetchFournisseurProducts,
-  fetchProductCategories,
   fetchAllProducts,
   fetchFournisseurProductsPaginated,
+  fetchProductsByCategoryPaginated,
   subscribeToProducts,
   invalidateProductCaches,
   ProductWithImage,
@@ -48,6 +47,17 @@ const COLORS = {
   textMuted: "#5A5A5A",
   danger: "#E53935",
 }
+
+// Fixed categories for filtering
+const FIXED_CATEGORIES = [
+  "Automobiles",
+  "Telephones",
+  "Accessoires",
+  "Vetements",
+  "Electronique",
+  "Maison",
+  "Beaute",
+]
 
 // Search Icon Component - Refined minimal style
 const SearchIcon: FC<{ size?: number; color?: string }> = ({ size = 24, color = "#FFFFFF" }) => {
@@ -330,7 +340,6 @@ export const MarketplaceScreen: FC<MarketplaceScreenProps> = function Marketplac
   const [newProducts, setNewProducts] = useState<ProductWithImage[]>([])
   const [saleProducts, setSaleProducts] = useState<ProductWithImage[]>([])
   const [allProducts, setAllProducts] = useState<ProductWithImage[]>([])
-  const [categories, setCategories] = useState<string[]>([])
   const [wishlistIds, setWishlistIds] = useState<string[]>([])
   const videoRef = useRef<Video>(null)
 
@@ -349,6 +358,13 @@ export const MarketplaceScreen: FC<MarketplaceScreenProps> = function Marketplac
   const [viewAllVisible, setViewAllVisible] = useState(false)
   const [viewAllTitle, setViewAllTitle] = useState("")
   const [viewAllProducts, setViewAllProducts] = useState<ProductWithImage[]>([])
+
+  // Category filter state
+  const [selectedCategory, setSelectedCategory] = useState<string | null>(null)
+  const [categoryProducts, setCategoryProducts] = useState<ProductWithImage[]>([])
+  const [categoryPage, setCategoryPage] = useState(0)
+  const [hasMoreCategory, setHasMoreCategory] = useState(true)
+  const [loadingCategory, setLoadingCategory] = useState(false)
 
   // Play video on mount
   useEffect(() => {
@@ -417,10 +433,9 @@ export const MarketplaceScreen: FC<MarketplaceScreenProps> = function Marketplac
   // Fetch data from Supabase
   const loadData = useCallback(async () => {
     try {
-      const [newProds, paginatedSale, cats, allProds] = await Promise.all([
+      const [newProds, paginatedSale, allProds] = await Promise.all([
         fetchNewProducts(10),
         fetchFournisseurProductsPaginated(0, PAGE_SIZE),
-        fetchProductCategories(),
         fetchAllProducts(),
       ])
 
@@ -438,8 +453,6 @@ export const MarketplaceScreen: FC<MarketplaceScreenProps> = function Marketplac
       setSaleProducts(paginatedSale.products)
       setHasMoreSale(paginatedSale.hasMore)
       setSalePage(0)
-
-      setCategories(cats)
     } catch (error) {
       console.error('Error loading marketplace data:', error)
     } finally {
@@ -465,6 +478,48 @@ export const MarketplaceScreen: FC<MarketplaceScreenProps> = function Marketplac
       setLoadingMore(false)
     }
   }, [salePage, loadingMore, hasMoreSale])
+
+  // Handle category selection
+  const handleCategoryPress = useCallback(async (category: string | null) => {
+    setSelectedCategory(category)
+
+    if (category === null) {
+      // Clear filter - show normal home page
+      setCategoryProducts([])
+      return
+    }
+
+    // Fetch products for selected category
+    setLoadingCategory(true)
+    setCategoryPage(0)
+    try {
+      const result = await fetchProductsByCategoryPaginated(category, 0, PAGE_SIZE)
+      setCategoryProducts(result.products)
+      setHasMoreCategory(result.hasMore)
+    } catch (error) {
+      console.error('Error fetching category products:', error)
+    } finally {
+      setLoadingCategory(false)
+    }
+  }, [])
+
+  // Load more category products
+  const loadMoreCategoryProducts = useCallback(async () => {
+    if (loadingCategory || !hasMoreCategory || !selectedCategory) return
+
+    setLoadingCategory(true)
+    try {
+      const nextPage = categoryPage + 1
+      const result = await fetchProductsByCategoryPaginated(selectedCategory, nextPage, PAGE_SIZE)
+      setCategoryProducts(prev => [...prev, ...result.products])
+      setHasMoreCategory(result.hasMore)
+      setCategoryPage(nextPage)
+    } catch (error) {
+      console.error('Error loading more category products:', error)
+    } finally {
+      setLoadingCategory(false)
+    }
+  }, [categoryPage, loadingCategory, hasMoreCategory, selectedCategory])
 
   // Initial load
   useEffect(() => {
@@ -537,113 +592,179 @@ export const MarketplaceScreen: FC<MarketplaceScreenProps> = function Marketplac
         </View>
 
         {/* Categories */}
-        {categories.length > 0 && (
-          <ScrollView
-            horizontal
-            showsHorizontalScrollIndicator={false}
-            style={styles.categoriesContainer}
-            contentContainerStyle={styles.categoriesContent}
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          style={styles.categoriesContainer}
+          contentContainerStyle={styles.categoriesContent}
+        >
+          {/* All chip to clear filter */}
+          <Pressable
+            style={[styles.categoryChip, selectedCategory === null && styles.categoryChipActive]}
+            onPress={() => handleCategoryPress(null)}
           >
-            {categories.map((category, index) => (
-              <Pressable key={index} style={styles.categoryChip}>
-                <Text style={styles.categoryName}>{category}</Text>
-              </Pressable>
-            ))}
-          </ScrollView>
-        )}
-
-        {/* New Products Section */}
-        <View style={styles.section}>
-          <View style={styles.sectionHeader}>
-            <View>
-              <Text style={styles.sectionTitle}>New</Text>
-              <Text style={styles.sectionSubtitle}>You've never seen it before!</Text>
-            </View>
-            <Pressable onPress={() => handleViewAll("New Products", allProducts.filter(p => p.is_new) || newProducts)}>
-              <Text style={styles.viewAllText}>View all</Text>
-            </Pressable>
-          </View>
-
-          {isLoading ? (
-            <View style={styles.loadingContainer}>
-              <ActivityIndicator size="small" color={COLORS.accent} />
-            </View>
-          ) : newProducts.length > 0 ? (
-            <ScrollView
-              horizontal
-              showsHorizontalScrollIndicator={false}
-              contentContainerStyle={styles.productsRow}
+            <Text style={[styles.categoryName, selectedCategory === null && styles.categoryNameActive]}>
+              All
+            </Text>
+          </Pressable>
+          {FIXED_CATEGORIES.map((category, index) => (
+            <Pressable
+              key={index}
+              style={[styles.categoryChip, selectedCategory === category && styles.categoryChipActive]}
+              onPress={() => handleCategoryPress(category)}
             >
-              {newProducts.map((product) => (
-                <ProductCard
-                  key={product.id}
-                  product={product}
-                  horizontal
-                  onPress={onProductPress}
-                  isInWishlist={wishlistIds.includes(product.id)}
-                  onWishlistToggle={handleWishlistToggle}
-                />
-              ))}
-            </ScrollView>
-          ) : (
-            <View style={styles.emptyState}>
-              <Text style={styles.emptyStateText}>No products available</Text>
-            </View>
-          )}
-        </View>
-
-        {/* Fournisseur Products Section (Sale) - Vertical Grid */}
-        <View style={styles.section}>
-          <View style={styles.sectionHeader}>
-            <View>
-              <Text style={styles.saleSectionTitle}>Sale</Text>
-              <Text style={styles.sectionSubtitle}>Products from our suppliers</Text>
-            </View>
-            <Pressable onPress={() => handleViewAll("Sale Products", saleProducts)}>
-              <Text style={styles.viewAllText}>View all</Text>
+              <Text style={[styles.categoryName, selectedCategory === category && styles.categoryNameActive]}>
+                {category}
+              </Text>
             </Pressable>
-          </View>
+          ))}
+        </ScrollView>
 
-          {isLoading ? (
-            <View style={styles.loadingContainer}>
-              <ActivityIndicator size="small" color={COLORS.accent} />
+        {selectedCategory ? (
+          // Category filtered view
+          <View style={styles.section}>
+            <View style={styles.sectionHeader}>
+              <View>
+                <Text style={styles.sectionTitle}>{selectedCategory}</Text>
+                <Text style={styles.sectionSubtitle}>{categoryProducts.length} products</Text>
+              </View>
             </View>
-          ) : saleProducts.length > 0 ? (
-            <>
-              <View style={styles.productsGrid}>
-                {saleProducts.map((product) => (
-                  <View key={product.id} style={styles.gridItem}>
+
+            {loadingCategory && categoryProducts.length === 0 ? (
+              <View style={styles.loadingContainer}>
+                <ActivityIndicator size="small" color={COLORS.accent} />
+              </View>
+            ) : categoryProducts.length > 0 ? (
+              <>
+                <View style={styles.productsGrid}>
+                  {categoryProducts.map((product) => (
+                    <View key={product.id} style={styles.gridItem}>
+                      <ProductCard
+                        product={product}
+                        onPress={onProductPress}
+                        isInWishlist={wishlistIds.includes(product.id)}
+                        onWishlistToggle={handleWishlistToggle}
+                      />
+                    </View>
+                  ))}
+                </View>
+                {hasMoreCategory && (
+                  <Pressable
+                    style={styles.loadMoreButton}
+                    onPress={loadMoreCategoryProducts}
+                    disabled={loadingCategory}
+                  >
+                    {loadingCategory ? (
+                      <ActivityIndicator size="small" color={COLORS.accent} />
+                    ) : (
+                      <Text style={styles.loadMoreText}>Voir Plus</Text>
+                    )}
+                  </Pressable>
+                )}
+              </>
+            ) : (
+              <View style={styles.emptyState}>
+                <Text style={styles.emptyStateText}>No products in this category</Text>
+              </View>
+            )}
+          </View>
+        ) : (
+          // Normal home page sections (New, Sale)
+          <>
+            {/* New Products Section */}
+            <View style={styles.section}>
+              <View style={styles.sectionHeader}>
+                <View>
+                  <Text style={styles.sectionTitle}>New</Text>
+                  <Text style={styles.sectionSubtitle}>You've never seen it before!</Text>
+                </View>
+                <Pressable onPress={() => handleViewAll("New Products", allProducts.filter(p => p.is_new) || newProducts)}>
+                  <Text style={styles.viewAllText}>View all</Text>
+                </Pressable>
+              </View>
+
+              {isLoading ? (
+                <View style={styles.loadingContainer}>
+                  <ActivityIndicator size="small" color={COLORS.accent} />
+                </View>
+              ) : newProducts.length > 0 ? (
+                <ScrollView
+                  horizontal
+                  showsHorizontalScrollIndicator={false}
+                  contentContainerStyle={styles.productsRow}
+                >
+                  {newProducts.map((product) => (
                     <ProductCard
+                      key={product.id}
                       product={product}
+                      horizontal
                       onPress={onProductPress}
                       isInWishlist={wishlistIds.includes(product.id)}
                       onWishlistToggle={handleWishlistToggle}
                     />
-                  </View>
-                ))}
+                  ))}
+                </ScrollView>
+              ) : (
+                <View style={styles.emptyState}>
+                  <Text style={styles.emptyStateText}>No products available</Text>
+                </View>
+              )}
+            </View>
+
+            {/* Fournisseur Products Section (Sale) - Vertical Grid */}
+            <View style={styles.section}>
+              <View style={styles.sectionHeader}>
+                <View>
+                  <Text style={styles.saleSectionTitle}>Sale</Text>
+                  <Text style={styles.sectionSubtitle}>Products from our suppliers</Text>
+                </View>
+                <Pressable onPress={() => handleViewAll("Sale Products", saleProducts)}>
+                  <Text style={styles.viewAllText}>View all</Text>
+                </Pressable>
               </View>
 
-              {/* Voir Plus Button */}
-              {hasMoreSale && (
-                <Pressable
-                  style={styles.loadMoreButton}
-                  onPress={loadMoreSaleProducts}
-                  disabled={loadingMore}
-                >
-                  {loadingMore ? (
-                    <ActivityIndicator size="small" color={COLORS.accent} />
-                  ) : (
-                    <Text style={styles.loadMoreText}>Voir Plus</Text>
+              {isLoading ? (
+                <View style={styles.loadingContainer}>
+                  <ActivityIndicator size="small" color={COLORS.accent} />
+                </View>
+              ) : saleProducts.length > 0 ? (
+                <>
+                  <View style={styles.productsGrid}>
+                    {saleProducts.map((product) => (
+                      <View key={product.id} style={styles.gridItem}>
+                        <ProductCard
+                          product={product}
+                          onPress={onProductPress}
+                          isInWishlist={wishlistIds.includes(product.id)}
+                          onWishlistToggle={handleWishlistToggle}
+                        />
+                      </View>
+                    ))}
+                  </View>
+
+                  {/* Voir Plus Button */}
+                  {hasMoreSale && (
+                    <Pressable
+                      style={styles.loadMoreButton}
+                      onPress={loadMoreSaleProducts}
+                      disabled={loadingMore}
+                    >
+                      {loadingMore ? (
+                        <ActivityIndicator size="small" color={COLORS.accent} />
+                      ) : (
+                        <Text style={styles.loadMoreText}>Voir Plus</Text>
+                      )}
+                    </Pressable>
                   )}
-                </Pressable>
+                </>
+              ) : (
+                <View style={styles.emptyState}>
+                  <Text style={styles.emptyStateText}>No products available</Text>
+                </View>
               )}
-            </>
-          ) : (
-            <View style={styles.emptyState}>
-              <Text style={styles.emptyStateText}>No products available</Text>
             </View>
-          )}
-        </View>
+          </>
+        )}
 
         {/* Spacer for bottom nav */}
         <View style={{ height: 100 }} />
@@ -848,6 +969,14 @@ const styles = StyleSheet.create({
     fontSize: 13,
     fontWeight: "600",
     color: COLORS.text,
+  } as TextStyle,
+
+  categoryChipActive: {
+    backgroundColor: COLORS.accent,
+  } as ViewStyle,
+
+  categoryNameActive: {
+    color: COLORS.background,
   } as TextStyle,
 
   categoryCount: {

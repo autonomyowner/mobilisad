@@ -38,8 +38,6 @@ import {
   invalidateSellerCaches,
   NewProductInput,
 } from "@/services/supabase/sellerService.cached"
-import { fetchProductCategories } from "@/services/supabase/productService.cached"
-import { getProductCategories } from "@/services/supabase/sellerService"
 import { B2BMarketplaceScreen } from "./B2BMarketplaceScreen"
 import { FreelanceOffersScreen } from "./FreelanceOffersScreen"
 import { canBuyInB2B, canSellInB2B } from "@/services/supabase/b2bService"
@@ -68,6 +66,17 @@ const COLORS = {
   info: "#3B82F6",
   infoMuted: "rgba(59, 130, 246, 0.15)",
 }
+
+// Fixed categories synced with home page
+const FIXED_CATEGORIES = [
+  "Automobiles",
+  "Telephones",
+  "Accessoires",
+  "Vetements",
+  "Electronique",
+  "Maison",
+  "Beaute",
+]
 
 type TabType = "overview" | "products" | "orders"
 
@@ -244,14 +253,12 @@ interface AddProductModalProps {
   visible: boolean
   onClose: () => void
   onAdd: (product: NewProductInput) => void
-  categories: string[]
 }
 
-const AddProductModal: FC<AddProductModalProps> = ({ visible, onClose, onAdd, categories }) => {
+const AddProductModal: FC<AddProductModalProps> = ({ visible, onClose, onAdd }) => {
   const [name, setName] = useState("")
   const [price, setPrice] = useState("")
-  const [category, setCategory] = useState(categories[0] || "")
-  const [productType, setProductType] = useState("")
+  const [category, setCategory] = useState(FIXED_CATEGORIES[0])
   const [description, setDescription] = useState("")
   const [stockQty, setStockQty] = useState("")
   const [isNew, setIsNew] = useState(false)
@@ -316,18 +323,14 @@ const AddProductModal: FC<AddProductModalProps> = ({ visible, onClose, onAdd, ca
       Alert.alert("Erreur", "Le prix doit etre superieur a 0")
       return
     }
-    if (!productType.trim()) {
-      Alert.alert("Erreur", "Le type de produit est requis")
-      return
-    }
 
     setUploading(true)
 
     onAdd({
       name: name.trim(),
       price: parseFloat(price),
-      category: category || "Autre",
-      product_type: productType.trim(),
+      category: category,
+      product_type: category, // Use category as product_type for DB compatibility
       description: description.trim(),
       stock_quantity: parseInt(stockQty) || 0,
       is_new: isNew,
@@ -339,7 +342,7 @@ const AddProductModal: FC<AddProductModalProps> = ({ visible, onClose, onAdd, ca
     // Reset form
     setName("")
     setPrice("")
-    setProductType("")
+    setCategory(FIXED_CATEGORIES[0])
     setDescription("")
     setStockQty("")
     setIsNew(false)
@@ -381,18 +384,9 @@ const AddProductModal: FC<AddProductModalProps> = ({ visible, onClose, onAdd, ca
               keyboardType="numeric"
             />
 
-            <Text style={styles.inputLabel}>Type de produit *</Text>
-            <TextInput
-              style={styles.textInput}
-              value={productType}
-              onChangeText={setProductType}
-              placeholder="Ex: Parfum Homme, Vetements Hiver, etc."
-              placeholderTextColor={COLORS.textMuted}
-            />
-
-            <Text style={styles.inputLabel}>Categorie</Text>
+            <Text style={styles.inputLabel}>Categorie *</Text>
             <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.categoryPicker}>
-              {categories.map((cat) => (
+              {FIXED_CATEGORIES.map((cat) => (
                 <TouchableOpacity
                   key={cat}
                   style={[styles.categoryChip, category === cat && styles.categoryChipActive]}
@@ -543,7 +537,6 @@ export const DashboardScreen: FC = function DashboardScreen() {
   const [recentOrders, setRecentOrders] = useState<SellerOrder[]>([])
   const [allOrders, setAllOrders] = useState<SellerOrder[]>([])
   const [products, setProducts] = useState<SellerProduct[]>([])
-  const [categories, setCategories] = useState<string[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [refreshing, setRefreshing] = useState(false)
   const [showAddProduct, setShowAddProduct] = useState(false)
@@ -561,17 +554,15 @@ export const DashboardScreen: FC = function DashboardScreen() {
     await invalidateSellerCaches(user.id)
 
     try {
-      const [statsData, ordersData, productsData, categoriesData, allOrdersData] = await Promise.all([
+      const [statsData, ordersData, productsData, allOrdersData] = await Promise.all([
         fetchSellerStats(user.id),
         fetchSellerRecentOrders(user.id, 5),
         fetchSellerProducts(user.id),
-        getProductCategories(),
         fetchSellerOrders(user.id),
       ])
       setStats(statsData)
       setRecentOrders(ordersData)
       setProducts(productsData)
-      setCategories(categoriesData)
       setAllOrders(allOrdersData)
     } catch (error) {
       console.error("Error loading dashboard:", error)
@@ -584,9 +575,23 @@ export const DashboardScreen: FC = function DashboardScreen() {
     if (isAuthenticated && isSeller) {
       loadDashboardData()
 
-      // Subscribe to real-time updates with cache invalidation
-      const ordersSubscription = subscribeToSellerOrdersWithCache(user!.id)
-      const productsSubscription = subscribeToSellerProductsWithCache(user!.id)
+      // Subscribe to real-time updates with cache invalidation AND UI refresh
+      const ordersSubscription = subscribeToSellerOrdersWithCache(
+        user!.id,
+        () => {
+          // Trigger data refresh when orders change
+          console.log('[Dashboard] Orders changed, refreshing data')
+          loadDashboardData()
+        }
+      )
+      const productsSubscription = subscribeToSellerProductsWithCache(
+        user!.id,
+        () => {
+          // Trigger data refresh when products change
+          console.log('[Dashboard] Products changed, refreshing data')
+          loadDashboardData()
+        }
+      )
 
       return () => {
         ordersSubscription.unsubscribe()
@@ -901,7 +906,6 @@ export const DashboardScreen: FC = function DashboardScreen() {
         visible={showAddProduct}
         onClose={() => setShowAddProduct(false)}
         onAdd={handleAddProduct}
-        categories={categories}
       />
 
       {/* Top gradient */}

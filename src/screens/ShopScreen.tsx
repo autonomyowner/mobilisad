@@ -336,9 +336,6 @@ export const ShopScreen: FC<ShopScreenProps> = function ShopScreen({
             <Text style={[styles.headerTabText, styles.headerTabActive]}>Trending</Text>
             <View style={styles.headerTabIndicator} />
           </Pressable>
-          <Pressable style={styles.headerTab} onPress={refresh}>
-            <Text style={styles.headerTabText}>New</Text>
-          </Pressable>
         </View>
       </View>
 

@@ -19,6 +19,7 @@ export interface UserProfile {
   provider_name?: string
   provider_avatar?: string
   is_demo_user?: boolean
+  push_token?: string | null
   created_at: string
   updated_at: string
 }

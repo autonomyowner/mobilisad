@@ -18,7 +18,8 @@
       "foregroundImage": "./assets/images/app-icon-android-adaptive-foreground.png",
       "backgroundImage": "./assets/images/app-icon-android-adaptive-background.png"
     },
-    "allowBackup": false
+    "allowBackup": false,
+    "googleServicesFile": "./google-services.json"
   },
   "ios": {
     "icon": "./assets/images/app-icon-ios.png",
@@ -38,7 +39,7 @@
         "image": "./assets/images/app-icon-android-adaptive-foreground.png",
         "imageWidth": 300,
         "resizeMode": "contain",
-        "backgroundColor": "#191015"
+        "backgroundColor": "#000000"
       }
     ],
     "expo-build-properties",
@@ -50,7 +51,13 @@
         "cameraPermission": "L'application a besoin d'accéder à votre caméra pour prendre des photos de produits."
       }
     ],
-    "expo-web-browser"
+    "expo-web-browser",
+    [
+      "expo-notifications",
+      {
+        "sounds": []
+      }
+    ]
   ],
   "experiments": {
     "tsconfigPaths": true,

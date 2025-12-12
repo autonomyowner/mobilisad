@@ -177,6 +177,7 @@ export const subscribeToSellerOrders = (sellerId: string, onUpdate: (payload: an
         event: '*',
         schema: 'public',
         table: 'orders',
+        filter: `seller_id=eq.${sellerId}`,
       },
       onUpdate
     )

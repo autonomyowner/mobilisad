@@ -188,22 +188,36 @@ export const invalidateSellerCaches = async (sellerId: string): Promise<void> =>
  * // Later, to unsubscribe:
  * subscription.unsubscribe()
  */
-export const subscribeToSellerOrdersWithCache = (sellerId: string) => {
+export const subscribeToSellerOrdersWithCache = (
+  sellerId: string,
+  onDataChanged?: () => void
+) => {
   return subscribeToSellerOrders(sellerId, async (payload) => {
     console.log("[Cache] Seller order updated, invalidating cache:", payload)
     // Invalidate cache when orders change
     await invalidateSellerCaches(sellerId)
+    // Trigger UI refresh callback
+    if (onDataChanged) {
+      onDataChanged()
+    }
   })
 }
 
 /**
  * Subscribe to real-time seller products and auto-invalidate cache
  */
-export const subscribeToSellerProductsWithCache = (sellerId: string) => {
+export const subscribeToSellerProductsWithCache = (
+  sellerId: string,
+  onDataChanged?: () => void
+) => {
   return subscribeToSellerProducts(sellerId, async (payload) => {
     console.log("[Cache] Seller product updated, invalidating cache:", payload)
     // Invalidate cache when products change
     await invalidateSellerCaches(sellerId)
+    // Trigger UI refresh callback
+    if (onDataChanged) {
+      onDataChanged()
+    }
   })
 }
 

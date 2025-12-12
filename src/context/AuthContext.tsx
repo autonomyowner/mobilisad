@@ -12,6 +12,11 @@ import {
   SignUpData,
   AuthResponse,
 } from '@/services/supabase/authService'
+import {
+  registerPushToken,
+  clearPushToken,
+  setupNotificationListeners,
+} from '@/services/notificationService'
 
 interface AuthContextType {
   user: UserProfile | null
@@ -41,6 +46,10 @@ export function AuthProvider({ children }: AuthProviderProps) {
       try {
         const profile = await getCurrentProfile()
         setUser(profile)
+        // Register push token for existing seller sessions
+        if (profile && (profile.role === 'seller' || profile.role === 'admin')) {
+          registerPushToken(profile.id)
+        }
       } catch (error) {
         console.error('Auth init error:', error)
       } finally {
@@ -56,8 +65,20 @@ export function AuthProvider({ children }: AuthProviderProps) {
       setIsLoading(false)
     })
 
+    // Set up notification listeners
+    const cleanupNotifications = setupNotificationListeners(
+      (notification) => {
+        console.log('Notification received in foreground:', notification)
+      },
+      (response) => {
+        console.log('User tapped notification:', response)
+        // Navigate to orders/dashboard when notification is tapped
+      }
+    )
+
     return () => {
       subscription.unsubscribe()
+      cleanupNotifications()
     }
   }, [])
 
@@ -67,6 +88,10 @@ export function AuthProvider({ children }: AuthProviderProps) {
       const response = await authSignIn(data)
       if (response.success && response.user) {
         setUser(response.user)
+        // Register push token for sellers
+        if (response.user.role === 'seller' || response.user.role === 'admin') {
+          registerPushToken(response.user.id)
+        }
       }
       return response
     } finally {
@@ -80,6 +105,10 @@ export function AuthProvider({ children }: AuthProviderProps) {
       const response = await authSignUp(data)
       if (response.success && response.user) {
         setUser(response.user)
+        // Register push token for sellers
+        if (response.user.role === 'seller' || response.user.role === 'admin') {
+          registerPushToken(response.user.id)
+        }
       }
       return response
     } finally {
@@ -93,6 +122,10 @@ export function AuthProvider({ children }: AuthProviderProps) {
       const response = await authSignInWithGoogle()
       if (response.success && response.user) {
         setUser(response.user)
+        // Register push token for sellers
+        if (response.user.role === 'seller' || response.user.role === 'admin') {
+          registerPushToken(response.user.id)
+        }
       }
       return response
     } finally {
@@ -103,6 +136,10 @@ export function AuthProvider({ children }: AuthProviderProps) {
   const signOut = async (): Promise<AuthResponse> => {
     setIsLoading(true)
     try {
+      // Clear push token before signing out
+      if (user?.id) {
+        await clearPushToken(user.id)
+      }
       const response = await authSignOut()
       if (response.success) {
         setUser(null)

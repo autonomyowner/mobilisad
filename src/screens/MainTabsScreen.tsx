@@ -5,6 +5,7 @@ import {
   Pressable,
   ViewStyle,
   Animated,
+  BackHandler,
 } from "react-native"
 import PagerView from "react-native-pager-view"
 import { useSafeAreaInsets } from "react-native-safe-area-context"
@@ -84,6 +85,29 @@ export const MainTabsScreen: FC = function MainTabsScreen() {
     }
     return undefined
   }, [user, loadCartCount])
+
+  // Handle Android hardware back button
+  useEffect(() => {
+    const backHandler = BackHandler.addEventListener("hardwareBackPress", () => {
+      // If product detail is open, close it
+      if (selectedProduct) {
+        setSelectedProduct(null)
+        return true
+      }
+
+      // If not on home tab, go back to home
+      if (currentPage > 0) {
+        pagerRef.current?.setPage(0)
+        setCurrentPage(0)
+        return true
+      }
+
+      // On home tab with nothing open - do nothing (don't exit)
+      return true
+    })
+
+    return () => backHandler.remove()
+  }, [selectedProduct, currentPage])
 
   // Animation values for each tab
   const scaleAnims = useRef(
