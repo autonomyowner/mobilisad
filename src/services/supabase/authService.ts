@@ -159,6 +159,8 @@ export const signInWithGoogle = async (): Promise<AuthResponse> => {
 // Sign up a new user
 export const signUp = async (data: SignUpData): Promise<AuthResponse> => {
   try {
+    console.log('[Auth] Starting signup for:', data.email, 'role:', data.role, 'seller_category:', data.sellerCategory)
+
     const { data: authData, error: signUpError } = await supabase.auth.signUp({
       email: data.email,
       password: data.password,
@@ -173,13 +175,16 @@ export const signUp = async (data: SignUpData): Promise<AuthResponse> => {
     })
 
     if (signUpError) {
-      console.error('Sign up error:', signUpError)
+      console.error('[Auth] Sign up error:', signUpError)
       return { success: false, error: signUpError.message }
     }
 
     if (!authData.user) {
+      console.error('[Auth] No user returned from signup')
       return { success: false, error: 'Failed to create user' }
     }
+
+    console.log('[Auth] Auth user created:', authData.user.id)
 
     // Create profile in profiles table
     const profile: Omit<UserProfile, 'created_at' | 'updated_at'> = {
@@ -188,7 +193,7 @@ export const signUp = async (data: SignUpData): Promise<AuthResponse> => {
       full_name: data.fullName,
       phone: data.phone,
       role: (data.role || 'customer') as UserRole,
-      seller_category: data.sellerCategory,
+      seller_category: data.role === 'seller' ? data.sellerCategory : undefined,
     }
 
     const { error: profileError } = await supabase
@@ -196,10 +201,14 @@ export const signUp = async (data: SignUpData): Promise<AuthResponse> => {
       .insert(profile)
 
     if (profileError) {
-      console.error('Profile creation error:', profileError)
-      // User was created but profile failed - still consider it a success
-      // Profile can be created later on first sign in
+      console.error('[Auth] Profile creation error:', profileError)
+      // User was created but profile failed - profile will be created on sign in
+      // Still return success so user can sign in
+    } else {
+      console.log('[Auth] Profile created successfully')
     }
+
+    console.log('[Auth] Signup completed successfully for:', data.email)
 
     return {
       success: true,
@@ -210,7 +219,7 @@ export const signUp = async (data: SignUpData): Promise<AuthResponse> => {
       }
     }
   } catch (error) {
-    console.error('Sign up exception:', error)
+    console.error('[Auth] Sign up exception:', error)
     return { success: false, error: 'An unexpected error occurred' }
   }
 }
@@ -218,19 +227,24 @@ export const signUp = async (data: SignUpData): Promise<AuthResponse> => {
 // Sign in an existing user
 export const signIn = async (data: SignInData): Promise<AuthResponse> => {
   try {
+    console.log('[Auth] Starting sign in for:', data.email)
+
     const { data: authData, error: signInError } = await supabase.auth.signInWithPassword({
       email: data.email,
       password: data.password,
     })
 
     if (signInError) {
-      console.error('Sign in error:', signInError)
+      console.error('[Auth] Sign in error:', signInError)
       return { success: false, error: signInError.message }
     }
 
     if (!authData.user) {
+      console.error('[Auth] No user returned from sign in')
       return { success: false, error: 'Failed to sign in' }
     }
+
+    console.log('[Auth] Auth successful, fetching profile for:', authData.user.id)
 
     // Fetch user profile
     const { data: profile, error: profileError } = await supabase
@@ -240,17 +254,31 @@ export const signIn = async (data: SignInData): Promise<AuthResponse> => {
       .single()
 
     if (profileError) {
-      console.error('Profile fetch error:', profileError)
-      // Create profile if it doesn't exist
+      console.log('[Auth] Profile not found, creating from auth metadata')
+      // Create profile if it doesn't exist - use metadata from auth
+      const metadata = authData.user.user_metadata || {}
+      const userRole = (metadata.role || 'customer') as UserRole
+      const userSellerCategory = metadata.seller_category as SellerCategory | undefined
+
+      console.log('[Auth] Creating profile with role:', userRole, 'seller_category:', userSellerCategory)
+
       const newProfile: Omit<UserProfile, 'created_at' | 'updated_at'> = {
         id: authData.user.id,
         email: authData.user.email || data.email,
-        full_name: authData.user.user_metadata?.full_name,
-        phone: authData.user.user_metadata?.phone,
-        role: 'customer' as UserRole,
+        full_name: metadata.full_name,
+        phone: metadata.phone,
+        role: userRole,
+        seller_category: userRole === 'seller' ? userSellerCategory : undefined,
       }
 
-      await supabase.from('user_profiles').insert(newProfile)
+      const { error: insertError } = await supabase.from('user_profiles').insert(newProfile)
+
+      if (insertError) {
+        console.error('[Auth] Profile creation error during sign in:', insertError)
+        return { success: false, error: 'Failed to create user profile' }
+      }
+
+      console.log('[Auth] Profile created successfully during sign in')
 
       return {
         success: true,
@@ -262,9 +290,10 @@ export const signIn = async (data: SignInData): Promise<AuthResponse> => {
       }
     }
 
+    console.log('[Auth] Sign in completed successfully, role:', profile.role, 'seller_category:', profile.seller_category)
     return { success: true, user: profile }
   } catch (error) {
-    console.error('Sign in exception:', error)
+    console.error('[Auth] Sign in exception:', error)
     return { success: false, error: 'An unexpected error occurred' }
   }
 }
