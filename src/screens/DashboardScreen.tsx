@@ -38,6 +38,25 @@ import {
   invalidateSellerCaches,
   NewProductInput,
 } from "@/services/supabase/sellerService.cached"
+import {
+  FreelanceService,
+  FreelanceRequest,
+  FreelancerStats,
+  ServiceCategory,
+  SERVICE_CATEGORIES,
+  ExperienceLevel,
+  PriceType,
+  AvailabilityStatus,
+  NewFreelanceServiceInput,
+  fetchFreelancerServices,
+  fetchFreelancerRequests,
+  fetchFreelancerStats,
+  createFreelanceService,
+  deleteFreelanceService,
+  updateServiceAvailability,
+  updateRequestStatus,
+  subscribeToFreelancerRequests,
+} from "@/services/supabase/freelanceService"
 import { B2BMarketplaceScreen } from "./B2BMarketplaceScreen"
 import { FreelanceOffersScreen } from "./FreelanceOffersScreen"
 import { canBuyInB2B, canSellInB2B } from "@/services/supabase/b2bService"
@@ -79,6 +98,7 @@ const FIXED_CATEGORIES = [
 ]
 
 type TabType = "overview" | "products" | "orders"
+type FreelancerTabType = "overview" | "services" | "requests"
 
 // Stats card component
 interface StatCardProps {
@@ -522,11 +542,409 @@ const NotSellerView: FC = () => (
   </View>
 )
 
+// ========== FREELANCER DASHBOARD COMPONENTS ==========
+
+// Freelancer service item component
+interface FreelancerServiceItemProps {
+  service: FreelanceService
+  onDelete: (id: string) => void
+  onToggleAvailability: (id: string, current: AvailabilityStatus) => void
+}
+
+const FreelancerServiceItem: FC<FreelancerServiceItemProps> = ({
+  service,
+  onDelete,
+  onToggleAvailability,
+}) => {
+  const handleDelete = () => {
+    Alert.alert(
+      "Supprimer le service",
+      `Voulez-vous vraiment supprimer "${service.service_title}"?`,
+      [
+        { text: "Annuler", style: "cancel" },
+        { text: "Supprimer", style: "destructive", onPress: () => onDelete(service.id) },
+      ]
+    )
+  }
+
+  const getAvailabilityStyle = (status: AvailabilityStatus) => {
+    switch (status) {
+      case "available":
+        return { bg: COLORS.successMuted, text: COLORS.success, label: "Disponible" }
+      case "busy":
+        return { bg: COLORS.warningMuted, text: COLORS.warning, label: "Occupe" }
+      case "unavailable":
+        return { bg: COLORS.errorMuted, text: COLORS.error, label: "Indisponible" }
+    }
+  }
+
+  const availStyle = getAvailabilityStyle(service.availability)
+
+  return (
+    <View style={styles.productItem}>
+      <View style={styles.productInfo}>
+        <Text style={styles.productName} numberOfLines={1}>
+          {service.service_title}
+        </Text>
+        <Text style={styles.productCategory}>{service.category}</Text>
+        <View style={styles.productMeta}>
+          <Text style={styles.productPrice}>
+            {(service.price || 0).toLocaleString()} DA
+            {service.price_type === "hourly" ? "/h" : service.price_type === "starting-at" ? "+" : ""}
+          </Text>
+          <TouchableOpacity
+            style={[styles.stockBadge, { backgroundColor: availStyle.bg }]}
+            onPress={() => onToggleAvailability(service.id, service.availability)}
+          >
+            <Text style={[styles.stockText, { color: availStyle.text }]}>{availStyle.label}</Text>
+          </TouchableOpacity>
+        </View>
+      </View>
+      <TouchableOpacity style={styles.deleteBtn} onPress={handleDelete}>
+        <Text style={styles.deleteBtnText}>X</Text>
+      </TouchableOpacity>
+    </View>
+  )
+}
+
+// Freelancer request item component
+interface FreelancerRequestItemProps {
+  request: FreelanceRequest
+  onUpdateStatus: (requestId: string, status: FreelanceRequest["status"]) => void
+}
+
+const FreelancerRequestItem: FC<FreelancerRequestItemProps> = ({ request, onUpdateStatus }) => {
+  const getStatusStyle = (status: string) => {
+    switch (status) {
+      case "pending":
+        return { bg: COLORS.warningMuted, text: COLORS.warning, label: "En Attente" }
+      case "accepted":
+        return { bg: COLORS.infoMuted, text: COLORS.info, label: "Accepte" }
+      case "in_progress":
+        return { bg: COLORS.goldMuted, text: COLORS.gold, label: "En Cours" }
+      case "completed":
+        return { bg: COLORS.successMuted, text: COLORS.success, label: "Termine" }
+      case "cancelled":
+        return { bg: COLORS.errorMuted, text: COLORS.error, label: "Annule" }
+      case "rejected":
+        return { bg: COLORS.errorMuted, text: COLORS.error, label: "Refuse" }
+      default:
+        return { bg: COLORS.surfaceBorder, text: COLORS.textSecondary, label: status }
+    }
+  }
+
+  const statusStyle = getStatusStyle(request.status)
+  const date = new Date(request.created_at)
+  const formattedDate = `${date.getDate().toString().padStart(2, "0")}/${(date.getMonth() + 1).toString().padStart(2, "0")}/${date.getFullYear()}`
+
+  const getNextStatus = (): { status: FreelanceRequest["status"]; label: string } | null => {
+    switch (request.status) {
+      case "pending":
+        return { status: "accepted", label: "Accepter" }
+      case "accepted":
+        return { status: "in_progress", label: "Commencer" }
+      case "in_progress":
+        return { status: "completed", label: "Terminer" }
+      default:
+        return null
+    }
+  }
+
+  const nextStatus = getNextStatus()
+
+  return (
+    <View style={styles.orderItem}>
+      <View style={styles.orderHeader}>
+        <Text style={styles.orderId}>#{request.id.slice(0, 8).toUpperCase()}</Text>
+        <View style={[styles.statusBadge, { backgroundColor: statusStyle.bg }]}>
+          <Text style={[styles.statusText, { color: statusStyle.text }]}>{statusStyle.label}</Text>
+        </View>
+      </View>
+
+      <View style={styles.orderBody}>
+        <View style={styles.orderInfo}>
+          {request.service && (
+            <Text style={styles.orderAmount}>{request.service.service_title}</Text>
+          )}
+          <Text style={styles.orderDate}>{formattedDate}</Text>
+          <Text style={styles.orderCustomer}>
+            {request.customer_name} - {request.customer_phone}
+          </Text>
+          {request.budget && (
+            <Text style={styles.productPrice}>Budget: {request.budget.toLocaleString()} DA</Text>
+          )}
+          <Text style={styles.orderAddress} numberOfLines={2}>
+            {request.message}
+          </Text>
+        </View>
+      </View>
+
+      {(request.status === "pending" || request.status === "accepted" || request.status === "in_progress") && (
+        <View style={styles.orderActions}>
+          {nextStatus && (
+            <TouchableOpacity
+              style={styles.actionBtn}
+              onPress={() => onUpdateStatus(request.id, nextStatus.status)}
+            >
+              <Text style={styles.actionBtnText}>{nextStatus.label}</Text>
+            </TouchableOpacity>
+          )}
+          {request.status === "pending" && (
+            <TouchableOpacity
+              style={[styles.actionBtn, styles.cancelBtn]}
+              onPress={() => onUpdateStatus(request.id, "rejected")}
+            >
+              <Text style={[styles.actionBtnText, styles.cancelBtnText]}>Refuser</Text>
+            </TouchableOpacity>
+          )}
+        </View>
+      )}
+    </View>
+  )
+}
+
+// Add Service Modal for Freelancers
+interface AddServiceModalProps {
+  visible: boolean
+  onClose: () => void
+  onAdd: (service: NewFreelanceServiceInput) => void
+}
+
+const EXPERIENCE_LEVELS: ExperienceLevel[] = ["Débutant", "Intermédiaire", "Expert"]
+const PRICE_TYPES: { value: PriceType; label: string }[] = [
+  { value: "fixed", label: "Fixe" },
+  { value: "hourly", label: "Par heure" },
+  { value: "starting-at", label: "A partir de" },
+]
+
+const AddServiceModal: FC<AddServiceModalProps> = ({ visible, onClose, onAdd }) => {
+  const [title, setTitle] = useState("")
+  const [category, setCategory] = useState<ServiceCategory>(SERVICE_CATEGORIES[0])
+  const [experienceLevel, setExperienceLevel] = useState<ExperienceLevel>("Intermédiaire")
+  const [price, setPrice] = useState("")
+  const [priceType, setPriceType] = useState<PriceType>("fixed")
+  const [description, setDescription] = useState("")
+  const [shortDescription, setShortDescription] = useState("")
+  const [skills, setSkills] = useState("")
+  const [deliveryTime, setDeliveryTime] = useState("")
+  const [revisions, setRevisions] = useState("")
+  const [responseTime, setResponseTime] = useState("Moins de 24h")
+  const [languages, setLanguages] = useState("Francais, Arabe")
+  const [uploading, setUploading] = useState(false)
+
+  const handleSubmit = () => {
+    if (!title.trim()) {
+      Alert.alert("Erreur", "Le titre du service est requis")
+      return
+    }
+    if (!price || parseFloat(price) <= 0) {
+      Alert.alert("Erreur", "Le prix doit etre superieur a 0")
+      return
+    }
+    if (!description.trim()) {
+      Alert.alert("Erreur", "La description est requise")
+      return
+    }
+
+    setUploading(true)
+
+    onAdd({
+      service_title: title.trim(),
+      category,
+      experience_level: experienceLevel,
+      price: parseFloat(price),
+      price_type: priceType,
+      description: description.trim(),
+      short_description: shortDescription.trim() || description.trim().slice(0, 100),
+      skills: skills.split(",").map(s => s.trim()).filter(Boolean),
+      delivery_time: deliveryTime.trim() || "3-5 jours",
+      revisions: revisions.trim() || "2 revisions",
+      languages: languages.split(",").map(l => l.trim()).filter(Boolean),
+      response_time: responseTime.trim(),
+      availability: "available",
+    })
+
+    // Reset form
+    setTitle("")
+    setCategory(SERVICE_CATEGORIES[0])
+    setExperienceLevel("Intermédiaire")
+    setPrice("")
+    setPriceType("fixed")
+    setDescription("")
+    setShortDescription("")
+    setSkills("")
+    setDeliveryTime("")
+    setRevisions("")
+    setResponseTime("Moins de 24h")
+    setLanguages("Francais, Arabe")
+    setUploading(false)
+    onClose()
+  }
+
+  return (
+    <Modal visible={visible} transparent animationType="slide">
+      <View style={styles.modalOverlay}>
+        <View style={styles.modalContent}>
+          <View style={styles.modalHeader}>
+            <Text style={styles.modalTitle}>Nouveau Service</Text>
+            <TouchableOpacity onPress={onClose}>
+              <Text style={styles.modalClose}>X</Text>
+            </TouchableOpacity>
+          </View>
+
+          <ScrollView style={styles.modalBody}>
+            <Text style={styles.inputLabel}>Titre du service *</Text>
+            <TextInput
+              style={styles.textInput}
+              value={title}
+              onChangeText={setTitle}
+              placeholder="Ex: Creation de site web professionnel"
+              placeholderTextColor={COLORS.textMuted}
+            />
+
+            <Text style={styles.inputLabel}>Categorie *</Text>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.categoryPicker}>
+              {SERVICE_CATEGORIES.map((cat) => (
+                <TouchableOpacity
+                  key={cat}
+                  style={[styles.categoryChip, category === cat && styles.categoryChipActive]}
+                  onPress={() => setCategory(cat)}
+                >
+                  <Text style={[styles.categoryChipText, category === cat && styles.categoryChipTextActive]}>
+                    {cat}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
+
+            <Text style={styles.inputLabel}>Niveau d'experience *</Text>
+            <View style={styles.experienceRow}>
+              {EXPERIENCE_LEVELS.map((level) => (
+                <TouchableOpacity
+                  key={level}
+                  style={[styles.experienceChip, experienceLevel === level && styles.experienceChipActive]}
+                  onPress={() => setExperienceLevel(level)}
+                >
+                  <Text style={[styles.experienceChipText, experienceLevel === level && styles.experienceChipTextActive]}>
+                    {level}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+
+            <Text style={styles.inputLabel}>Prix (DA) *</Text>
+            <View style={styles.priceRow}>
+              <TextInput
+                style={[styles.textInput, { flex: 1 }]}
+                value={price}
+                onChangeText={setPrice}
+                placeholder="0"
+                placeholderTextColor={COLORS.textMuted}
+                keyboardType="numeric"
+              />
+              <View style={styles.priceTypeContainer}>
+                {PRICE_TYPES.map((pt) => (
+                  <TouchableOpacity
+                    key={pt.value}
+                    style={[styles.priceTypeChip, priceType === pt.value && styles.priceTypeChipActive]}
+                    onPress={() => setPriceType(pt.value)}
+                  >
+                    <Text style={[styles.priceTypeText, priceType === pt.value && styles.priceTypeTextActive]}>
+                      {pt.label}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+            </View>
+
+            <Text style={styles.inputLabel}>Description courte</Text>
+            <TextInput
+              style={styles.textInput}
+              value={shortDescription}
+              onChangeText={setShortDescription}
+              placeholder="Resume de votre service (max 100 caracteres)"
+              placeholderTextColor={COLORS.textMuted}
+              maxLength={100}
+            />
+
+            <Text style={styles.inputLabel}>Description complete *</Text>
+            <TextInput
+              style={[styles.textInput, styles.textArea]}
+              value={description}
+              onChangeText={setDescription}
+              placeholder="Decrivez votre service en detail"
+              placeholderTextColor={COLORS.textMuted}
+              multiline
+              numberOfLines={4}
+            />
+
+            <Text style={styles.inputLabel}>Competences (separees par virgule)</Text>
+            <TextInput
+              style={styles.textInput}
+              value={skills}
+              onChangeText={setSkills}
+              placeholder="React, TypeScript, Node.js"
+              placeholderTextColor={COLORS.textMuted}
+            />
+
+            <Text style={styles.inputLabel}>Delai de livraison</Text>
+            <TextInput
+              style={styles.textInput}
+              value={deliveryTime}
+              onChangeText={setDeliveryTime}
+              placeholder="3-5 jours"
+              placeholderTextColor={COLORS.textMuted}
+            />
+
+            <Text style={styles.inputLabel}>Revisions incluses</Text>
+            <TextInput
+              style={styles.textInput}
+              value={revisions}
+              onChangeText={setRevisions}
+              placeholder="2 revisions"
+              placeholderTextColor={COLORS.textMuted}
+            />
+
+            <Text style={styles.inputLabel}>Temps de reponse</Text>
+            <TextInput
+              style={styles.textInput}
+              value={responseTime}
+              onChangeText={setResponseTime}
+              placeholder="Moins de 24h"
+              placeholderTextColor={COLORS.textMuted}
+            />
+
+            <Text style={styles.inputLabel}>Langues (separees par virgule)</Text>
+            <TextInput
+              style={styles.textInput}
+              value={languages}
+              onChangeText={setLanguages}
+              placeholder="Francais, Arabe, Anglais"
+              placeholderTextColor={COLORS.textMuted}
+            />
+          </ScrollView>
+
+          <TouchableOpacity
+            style={[styles.submitBtn, uploading && styles.submitBtnDisabled]}
+            onPress={handleSubmit}
+            disabled={uploading}
+          >
+            <Text style={styles.submitBtnText}>
+              {uploading ? "Ajout en cours..." : "Ajouter le service"}
+            </Text>
+          </TouchableOpacity>
+        </View>
+      </View>
+    </Modal>
+  )
+}
+
 export const DashboardScreen: FC = function DashboardScreen() {
   const $topInsets = useSafeAreaInsetsStyle(["top"])
   const $bottomInsets = useSafeAreaInsetsStyle(["bottom"])
   const { user, isAuthenticated, isLoading: authLoading } = useAuth()
 
+  // Seller state
   const [activeTab, setActiveTab] = useState<TabType>("overview")
   const [stats, setStats] = useState<SellerStats>({
     totalProducts: 0,
@@ -543,7 +961,21 @@ export const DashboardScreen: FC = function DashboardScreen() {
   const [showB2BMarketplace, setShowB2BMarketplace] = useState(false)
   const [showFreelanceOffers, setShowFreelanceOffers] = useState(false)
 
+  // Freelancer state
+  const [freelancerTab, setFreelancerTab] = useState<FreelancerTabType>("overview")
+  const [freelancerStats, setFreelancerStats] = useState<FreelancerStats>({
+    totalServices: 0,
+    totalRequests: 0,
+    pendingRequests: 0,
+    completedProjects: 0,
+    totalEarnings: 0,
+  })
+  const [freelancerServices, setFreelancerServices] = useState<FreelanceService[]>([])
+  const [freelancerRequests, setFreelancerRequests] = useState<FreelanceRequest[]>([])
+  const [showAddService, setShowAddService] = useState(false)
+
   const isSeller = user?.role === "seller" || user?.role === "admin"
+  const isFreelancer = user?.role === "freelancer"
   const userCategory = user?.seller_category || "fournisseur"
   const hasB2BAccess = canBuyInB2B(userCategory) || canSellInB2B(userCategory)
 
@@ -570,6 +1002,26 @@ export const DashboardScreen: FC = function DashboardScreen() {
       setIsLoading(false)
     }
   }, [user?.id, isSeller])
+
+  // Freelancer data loading
+  const loadFreelancerData = useCallback(async () => {
+    if (!user?.id || !isFreelancer) return
+
+    try {
+      const [statsData, servicesData, requestsData] = await Promise.all([
+        fetchFreelancerStats(user.id),
+        fetchFreelancerServices(user.id),
+        fetchFreelancerRequests(user.id),
+      ])
+      setFreelancerStats(statsData)
+      setFreelancerServices(servicesData)
+      setFreelancerRequests(requestsData)
+    } catch (error) {
+      console.error("Error loading freelancer dashboard:", error)
+    } finally {
+      setIsLoading(false)
+    }
+  }, [user?.id, isFreelancer])
 
   useEffect(() => {
     if (isAuthenticated && isSeller) {
@@ -603,14 +1055,41 @@ export const DashboardScreen: FC = function DashboardScreen() {
     }
   }, [isAuthenticated, isSeller, loadDashboardData])
 
+  // Freelancer useEffect
+  useEffect(() => {
+    if (isAuthenticated && isFreelancer) {
+      loadFreelancerData()
+
+      // Subscribe to real-time updates for requests
+      const requestsSubscription = subscribeToFreelancerRequests(
+        user!.id,
+        () => {
+          console.log('[Dashboard] Freelancer requests changed, refreshing data')
+          loadFreelancerData()
+        }
+      )
+
+      return () => {
+        requestsSubscription.unsubscribe()
+      }
+    } else if (!isSeller) {
+      setIsLoading(false)
+    }
+    return undefined
+  }, [isAuthenticated, isFreelancer, loadFreelancerData, isSeller])
+
   const onRefresh = useCallback(async () => {
     setRefreshing(true)
     if (user?.id) {
-      await invalidateSellerCaches(user.id)
+      if (isSeller) {
+        await invalidateSellerCaches(user.id)
+        await loadDashboardData()
+      } else if (isFreelancer) {
+        await loadFreelancerData()
+      }
     }
-    await loadDashboardData()
     setRefreshing(false)
-  }, [loadDashboardData, user?.id])
+  }, [loadDashboardData, loadFreelancerData, user?.id, isSeller, isFreelancer])
 
   const handleAddProduct = async (productData: NewProductInput) => {
     if (!user?.id) return
@@ -651,6 +1130,56 @@ export const DashboardScreen: FC = function DashboardScreen() {
     }
   }
 
+  // Freelancer handlers
+  const handleAddService = async (serviceData: NewFreelanceServiceInput) => {
+    if (!user?.id) return
+
+    const result = await createFreelanceService(user.id, serviceData)
+    if (result.success) {
+      Alert.alert("Succes", "Service ajoute avec succes")
+      loadFreelancerData()
+    } else {
+      Alert.alert("Erreur", result.error || "Erreur lors de l'ajout du service")
+    }
+  }
+
+  const handleDeleteService = async (serviceId: string) => {
+    if (!user?.id) return
+
+    const result = await deleteFreelanceService(serviceId)
+    if (result.success) {
+      Alert.alert("Succes", "Service supprime")
+      loadFreelancerData()
+    } else {
+      Alert.alert("Erreur", result.error || "Erreur lors de la suppression")
+    }
+  }
+
+  const handleToggleAvailability = async (serviceId: string, current: AvailabilityStatus) => {
+    if (!user?.id) return
+
+    const nextAvailability: AvailabilityStatus =
+      current === "available" ? "busy" : current === "busy" ? "unavailable" : "available"
+
+    const result = await updateServiceAvailability(serviceId, user.id, nextAvailability)
+    if (result.success) {
+      loadFreelancerData()
+    } else {
+      Alert.alert("Erreur", result.error || "Erreur lors de la mise a jour")
+    }
+  }
+
+  const handleUpdateRequestStatus = async (requestId: string, status: FreelanceRequest["status"]) => {
+    if (!user?.id) return
+
+    const result = await updateRequestStatus(requestId, user.id, status)
+    if (result.success) {
+      loadFreelancerData()
+    } else {
+      Alert.alert("Erreur", result.error || "Erreur lors de la mise a jour")
+    }
+  }
+
   // Loading state
   if (authLoading || (isAuthenticated && isLoading)) {
     return (
@@ -670,8 +1199,8 @@ export const DashboardScreen: FC = function DashboardScreen() {
     )
   }
 
-  // Not a seller
-  if (!isSeller) {
+  // Not a seller or freelancer
+  if (!isSeller && !isFreelancer) {
     return (
       <View style={[styles.container, $topInsets]}>
         <NotSellerView />
@@ -679,8 +1208,8 @@ export const DashboardScreen: FC = function DashboardScreen() {
     )
   }
 
-  // Show B2B Marketplace if selected
-  if (showB2BMarketplace) {
+  // Show B2B Marketplace if selected (sellers only)
+  if (showB2BMarketplace && isSeller) {
     return (
       <B2BMarketplaceScreen onBack={() => setShowB2BMarketplace(false)} />
     )
@@ -693,6 +1222,204 @@ export const DashboardScreen: FC = function DashboardScreen() {
     )
   }
 
+  // ========== FREELANCER DASHBOARD ==========
+  if (isFreelancer) {
+    return (
+      <View style={[styles.container, $topInsets]}>
+        {/* Header */}
+        <View style={styles.header}>
+          <View style={styles.headerContent}>
+            <View>
+              <Text style={styles.greeting}>Bonjour,</Text>
+              <Text style={styles.userName}>{user?.full_name || "Freelancer"}</Text>
+            </View>
+            <TouchableOpacity
+              style={styles.freelancersCta}
+              onPress={() => setShowFreelanceOffers(true)}
+              activeOpacity={0.8}
+            >
+              <Text style={styles.freelancersCtaText}>Voir Offres</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+
+        {/* Tabs */}
+        <View style={styles.tabsContainer}>
+          <TouchableOpacity
+            style={[styles.tab, freelancerTab === "overview" && styles.tabActive]}
+            onPress={() => setFreelancerTab("overview")}
+          >
+            <Text style={[styles.tabText, freelancerTab === "overview" && styles.tabTextActive]}>Vue</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[styles.tab, freelancerTab === "services" && styles.tabActive]}
+            onPress={() => setFreelancerTab("services")}
+          >
+            <Text style={[styles.tabText, freelancerTab === "services" && styles.tabTextActive]}>
+              Services ({freelancerServices.length})
+            </Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[styles.tab, freelancerTab === "requests" && styles.tabActive]}
+            onPress={() => setFreelancerTab("requests")}
+          >
+            <Text style={[styles.tabText, freelancerTab === "requests" && styles.tabTextActive]}>
+              Demandes ({freelancerStats.pendingRequests})
+            </Text>
+          </TouchableOpacity>
+        </View>
+
+        <ScrollView
+          style={styles.scrollView}
+          contentContainerStyle={[styles.scrollContent, $bottomInsets]}
+          showsVerticalScrollIndicator={false}
+          refreshControl={
+            <RefreshControl
+              refreshing={refreshing}
+              onRefresh={onRefresh}
+              tintColor={COLORS.gold}
+              colors={[COLORS.gold]}
+            />
+          }
+        >
+          {/* Overview Tab */}
+          {freelancerTab === "overview" && (
+            <>
+              {/* Stats Grid */}
+              <View style={styles.statsSection}>
+                <Text style={styles.sectionTitle}>Statistiques</Text>
+                <View style={styles.statsGrid}>
+                  <StatCard
+                    label="Gains"
+                    value={(freelancerStats.totalEarnings || 0).toLocaleString()}
+                    suffix="DA"
+                    variant="gold"
+                  />
+                  <StatCard label="Services" value={freelancerStats.totalServices || 0} />
+                  <StatCard
+                    label="En Attente"
+                    value={freelancerStats.pendingRequests || 0}
+                    variant={freelancerStats.pendingRequests > 0 ? "warning" : "default"}
+                  />
+                  <StatCard label="Projets" value={freelancerStats.completedProjects || 0} variant="success" />
+                </View>
+              </View>
+
+              {/* Quick Actions */}
+              <View style={styles.actionsSection}>
+                <Text style={styles.sectionTitle}>Actions Rapides</Text>
+                <TouchableOpacity style={styles.quickAction} onPress={() => setShowAddService(true)}>
+                  <Text style={styles.quickActionTitle}>Nouveau Service</Text>
+                  <Text style={styles.quickActionSubtitle}>Ajouter un service</Text>
+                </TouchableOpacity>
+                <TouchableOpacity style={styles.quickAction} onPress={() => setFreelancerTab("requests")}>
+                  <Text style={styles.quickActionTitle}>Demandes</Text>
+                  <Text style={styles.quickActionSubtitle}>Gerer les demandes clients</Text>
+                </TouchableOpacity>
+                <TouchableOpacity style={styles.quickAction} onPress={() => setFreelancerTab("services")}>
+                  <Text style={styles.quickActionTitle}>Mes Services</Text>
+                  <Text style={styles.quickActionSubtitle}>Voir et modifier vos services</Text>
+                </TouchableOpacity>
+              </View>
+
+              {/* Recent Requests */}
+              <View style={styles.ordersSection}>
+                <View style={styles.sectionHeader}>
+                  <Text style={styles.sectionTitle}>Demandes Recentes</Text>
+                  <TouchableOpacity onPress={() => setFreelancerTab("requests")}>
+                    <Text style={styles.seeAllText}>Voir tout</Text>
+                  </TouchableOpacity>
+                </View>
+                {freelancerRequests.length === 0 ? (
+                  <View style={styles.emptyState}>
+                    <Text style={styles.emptyStateText}>Aucune demande recente</Text>
+                  </View>
+                ) : (
+                  freelancerRequests.slice(0, 3).map((request) => (
+                    <FreelancerRequestItem
+                      key={request.id}
+                      request={request}
+                      onUpdateStatus={handleUpdateRequestStatus}
+                    />
+                  ))
+                )}
+              </View>
+            </>
+          )}
+
+          {/* Services Tab */}
+          {freelancerTab === "services" && (
+            <View style={styles.productsSection}>
+              <View style={styles.sectionHeader}>
+                <Text style={styles.sectionTitle}>Mes Services</Text>
+                <TouchableOpacity style={styles.addBtn} onPress={() => setShowAddService(true)}>
+                  <Text style={styles.addBtnText}>+ Ajouter</Text>
+                </TouchableOpacity>
+              </View>
+              {freelancerServices.length === 0 ? (
+                <View style={styles.emptyState}>
+                  <Text style={styles.emptyStateText}>Aucun service</Text>
+                  <TouchableOpacity
+                    style={styles.emptyStateBtn}
+                    onPress={() => setShowAddService(true)}
+                  >
+                    <Text style={styles.emptyStateBtnText}>Ajouter un service</Text>
+                  </TouchableOpacity>
+                </View>
+              ) : (
+                freelancerServices.map((service) => (
+                  <FreelancerServiceItem
+                    key={service.id}
+                    service={service}
+                    onDelete={handleDeleteService}
+                    onToggleAvailability={handleToggleAvailability}
+                  />
+                ))
+              )}
+            </View>
+          )}
+
+          {/* Requests Tab */}
+          {freelancerTab === "requests" && (
+            <View style={styles.ordersSection}>
+              <Text style={styles.sectionTitle}>Toutes les Demandes</Text>
+              {freelancerRequests.length === 0 ? (
+                <View style={styles.emptyState}>
+                  <Text style={styles.emptyStateText}>Aucune demande</Text>
+                </View>
+              ) : (
+                freelancerRequests.map((request) => (
+                  <FreelancerRequestItem
+                    key={request.id}
+                    request={request}
+                    onUpdateStatus={handleUpdateRequestStatus}
+                  />
+                ))
+              )}
+            </View>
+          )}
+
+          <View style={{ height: 100 }} />
+        </ScrollView>
+
+        {/* Add Service Modal */}
+        <AddServiceModal
+          visible={showAddService}
+          onClose={() => setShowAddService(false)}
+          onAdd={handleAddService}
+        />
+
+        {/* Top gradient */}
+        <LinearGradient
+          colors={["rgba(8, 8, 10, 1)", "rgba(8, 8, 10, 0)"]}
+          style={styles.topGradient}
+          pointerEvents="none"
+        />
+      </View>
+    )
+  }
+
+  // ========== SELLER DASHBOARD ==========
   return (
     <View style={[styles.container, $topInsets]}>
       {/* B2B Banner - Only for Grossistes and Fournisseurs */}
@@ -1539,5 +2266,61 @@ const styles = StyleSheet.create({
     fontSize: 18,
     fontWeight: "700",
     color: "#000",
+  } as TextStyle,
+
+  // Freelancer Modal Styles
+  experienceRow: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 8,
+  } as ViewStyle,
+  experienceChip: {
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    backgroundColor: COLORS.surface,
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: COLORS.surfaceBorder,
+  } as ViewStyle,
+  experienceChipActive: {
+    backgroundColor: COLORS.goldMuted,
+    borderColor: COLORS.goldDark,
+  } as ViewStyle,
+  experienceChipText: {
+    fontSize: 13,
+    color: COLORS.textSecondary,
+  } as TextStyle,
+  experienceChipTextActive: {
+    color: COLORS.gold,
+  } as TextStyle,
+  priceRow: {
+    flexDirection: "row",
+    gap: 12,
+    alignItems: "flex-start",
+  } as ViewStyle,
+  priceTypeContainer: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 6,
+    flex: 1,
+  } as ViewStyle,
+  priceTypeChip: {
+    paddingHorizontal: 10,
+    paddingVertical: 8,
+    backgroundColor: COLORS.surface,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: COLORS.surfaceBorder,
+  } as ViewStyle,
+  priceTypeChipActive: {
+    backgroundColor: COLORS.goldMuted,
+    borderColor: COLORS.goldDark,
+  } as ViewStyle,
+  priceTypeText: {
+    fontSize: 11,
+    color: COLORS.textSecondary,
+  } as TextStyle,
+  priceTypeTextActive: {
+    color: COLORS.gold,
   } as TextStyle,
 })
